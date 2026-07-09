@@ -1,0 +1,15 @@
+{
+  "name": "lesson-3-fs-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Custom 4-tool Filesystem MCP server from s01e03",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "glob": "^11.0.0",
+    "openai": "^6.45.0"
+  }
+}

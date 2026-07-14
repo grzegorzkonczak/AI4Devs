@@ -627,3 +627,82 @@ End frame prompt example:
 **Longer video by chaining clips:** Kling is limited to 10 seconds, but the last frame of clip 1 can be the start frame of clip 2 — concatenation (not shown in this example) is the only missing piece.
 
 **Seen in:** `01_04_video_generation` (`src/config.js` instructions, `native/tools.js` `image_to_video` handler)
+
+---
+
+## 19. Human-in-the-Loop Confirmation (Injected Callback)
+
+**What it solves:** An agent that can take real-world irreversible actions (send email, delete files, make payments) must pause and get explicit human approval before executing. The check must be **deterministic code** — not LLM interpretation of "yes/no" text.
+
+**Structure:**
+```
+agent.js:
+  const TOOLS_REQUIRING_CONFIRMATION = new Set(["send_email", "delete_file"])
+
+  if (TOOLS_REQUIRING_CONFIRMATION.has(toolName) && confirmTool) {
+    const confirmed = await confirmTool(toolName, args)
+    if (!confirmed) return { success: false, rejected: true }
+  }
+
+repl.js:
+  const trustedTools = new Set()
+  const confirmTool = createConfirmationHandler(rl, trustedTools)
+  // confirmTool is injected into agent.run()
+
+  // createConfirmationHandler returns a closure:
+  async (toolName, args) => {
+    if (trustedTools.has(toolName)) return true          // auto-approve if trusted
+    // show full UI with all action details
+    const answer = await rl.question("Your choice: ")
+    if (answer === "t") { trustedTools.add(toolName); return true }  // trust for session
+    return answer === "y"
+  }
+```
+
+**Why inject `confirmTool` as a parameter?**  
+`agent.js` is generic — it doesn't own the UI. Different callers (REPL, HTTP endpoint, Telegram bot) provide their own implementation. This is **dependency injection via function parameters** — the agent loop depends on the capability without owning the implementation.
+
+**Trust mechanism:** Once the user presses T, the tool is added to `trustedTools` (a Set). All subsequent calls skip the prompt for that session. `untrust` command clears the set. In production: persist trust between sessions, invalidate if tool schema/name changes (especially for MCP tools that can update silently).
+
+**Tool runs sequentially when confirmation is needed:**
+```js
+for (const tc of toolCalls) {
+  const result = await runTool(...)  // NOT Promise.all — each might pause for input
+  results.push(result)
+}
+```
+
+**Seen in:** `agent.js` + `repl.js` in `01_05_confirmation`
+
+---
+
+## 20. File-Based Security Rules (Whitelist)
+
+**What it solves:** Security constraints that must be enforced at the code level — not in LLM instructions (which can be bypassed or hallucinated around). A whitelist file + validation function is deterministic; system prompt rules are not.
+
+**Structure:**
+```
+workspace/whitelist.json:
+{
+  "allowed_recipients": [
+    "alice@aidevs.pl",
+    "@yourdomain.com"        ← domain pattern: all addresses on this domain
+  ]
+}
+
+native/tools.js:
+const isEmailAllowed = (email, whitelist) => {
+  const domain = email.toLowerCase().split("@")[1]
+  return whitelist.some(pattern => {
+    if (pattern.startsWith("@")) return domain === pattern.slice(1)
+    return email.toLowerCase() === pattern.toLowerCase()
+  })
+}
+
+// If validation fails → return { success: false, error: "not in whitelist" }
+// LLM never gets a chance to reach the API
+```
+
+**Why not in system prompt?** The LLM could be instructed by malicious input to "ignore the whitelist" (prompt injection). Code-level validation cannot be overridden.
+
+**Seen in:** `native/tools.js` in `01_05_confirmation`

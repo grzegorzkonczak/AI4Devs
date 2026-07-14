@@ -522,3 +522,92 @@ The agent loop imports only from `tools.js` — it never knows about the subdire
 
 Seen in: `src/native/` in `01_04_image_guidance`
 
+---
+
+## Graceful shutdown with SIGINT/SIGTERM
+
+Register cleanup logic that runs when the user presses Ctrl+C or the system requests shutdown:
+
+```js
+export const onShutdown = (cleanup) => {
+  let shuttingDown = false
+
+  const handler = async () => {
+    if (shuttingDown) return   // prevent double-cleanup if both signals fire
+    shuttingDown = true
+    await cleanup()
+    process.exit(0)
+  }
+
+  process.on("SIGINT", handler)   // Ctrl+C
+  process.on("SIGTERM", handler)  // system shutdown (e.g. Docker stop)
+
+  return handler  // also call manually on normal exit
+}
+
+// Usage:
+const shutdown = onShutdown(async () => {
+  logStats()
+  rl?.close()
+  if (mcpClient) await closeMcpClient(mcpClient)
+})
+
+await runRepl(...)
+await shutdown()  // trigger same cleanup on normal exit too
+```
+
+Seen in: `src/helpers/shutdown.js` in `01_05_confirmation`
+
+---
+
+## Token usage tracker (module-level singleton)
+
+Track cumulative token usage across all LLM calls in a session:
+
+```js
+// stats.js
+let totalTokens = { input: 0, output: 0, requests: 0 }
+
+export const recordUsage = (usage) => {
+  if (!usage) return
+  totalTokens.input += usage.input_tokens || 0
+  totalTokens.output += usage.output_tokens || 0
+  totalTokens.requests += 1
+}
+
+export const logStats = () => {
+  const { input, output, requests } = totalTokens
+  console.log(`📊 Stats: ${requests} requests, ${input} input tokens, ${output} output tokens`)
+}
+
+export const resetStats = () => {
+  totalTokens = { input: 0, output: 0, requests: 0 }
+}
+```
+
+Call `recordUsage(response.usage)` in `api.js` after every LLM response. Because ES modules are singletons, the same counter is shared across the whole app.
+
+Seen in: `src/helpers/stats.js` in `01_05_confirmation`
+
+---
+
+## Colored terminal logger module
+
+Centralized logging with timestamps and ANSI colors — avoids scattered `console.log` calls:
+
+```js
+const colors = { reset: "\x1b[0m", green: "\x1b[32m", red: "\x1b[31m", ... }
+const timestamp = () => new Date().toLocaleTimeString("en-US", { hour12: false })
+
+const log = {
+  info: (msg) => console.log(`${colors.dim}[${timestamp()}]${colors.reset} ${msg}`),
+  success: (msg) => console.log(`... ${colors.green}✓${colors.reset} ${msg}`),
+  error: (title, msg) => console.log(`... ${colors.red}✗ ${title}${colors.reset} ${msg}`),
+  tool: (name, args) => console.log(`... ${colors.yellow}⚡${colors.reset} ${name} ...`),
+  box: (text) => { /* draws unicode box around text */ }
+}
+
+export default log
+```
+
+Seen in: `src/helpers/logger.js` in `01_05_confirmation`

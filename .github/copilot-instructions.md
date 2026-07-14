@@ -20,13 +20,29 @@ Each lesson's exercise code lives alongside the lesson data in its `Lesson N/` d
 
 ## Environment — IMPORTANT
 
-**This project runs on a DigitalOcean droplet, not the local Windows machine.**
+**Two-machine workflow via GitHub:**
+- **Windows machine** (here): edit files, commit, push to GitHub. Copilot CLI runs here.
+- **Droplet** (`209.38.202.11`): pull from GitHub, run all `node` commands. Accessed via DigitalOcean browser console.
+- **GitHub repo**: `https://github.com/grzegorzkonczak/AI4Devs.git` — the bridge between machines.
 
-- Local machine: Windows laptop on a corporate network (heavily firewalled — cannot expose ports, SSH often blocked)
-- Execution environment: Ubuntu droplet at `209.38.202.11`, accessed via DigitalOcean browser console
-- All `node` commands, `npm install`, and server runs happen on the droplet
-- Use **bash syntax** for all terminal commands (not PowerShell)
-- Use **nano** for file editing on the droplet
+**Typical workflow:**
+1. Edit/create files on Windows with Copilot CLI
+2. Commit and push: `git add . && git commit -m "..." && git push origin main`
+3. On droplet: `cd ~/AI4Devs && git pull` to get latest
+4. Run: `cd "Lesson N/example-folder" && node solution.js`
+
+**Windows details:**
+- Corporate network, heavily firewalled (SSH port 22 blocked, but SSH over port 443 via `ssh.github.com` works)
+- Git remote uses SSH with personal key: `git@github-personal:grzegorzkonczak/AI4Devs.git`
+- SSH config at `~/.ssh/config` routes `github-personal` → `ssh.github.com:443`
+- Use PowerShell/cmd for local file operations only — never for running node
+
+**Droplet details:**
+- Ubuntu at `209.38.202.11`, accessed via DigitalOcean browser console
+- All `node` commands, `npm install`, and server runs happen here
+- Use **bash syntax** for all droplet commands
+- Use **nano** for file editing on the droplet (but prefer editing on Windows + git pull)
+- `OPENAI_API_KEY` set in `~/.bashrc`; shared `node_modules` at `~/AI4Devs/node_modules`
 
 See `Lesson 3/SUMMARY.md` → "Environment & execution notes" for full details on:
 - Running servers, backgrounding processes, tmux setup

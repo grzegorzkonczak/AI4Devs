@@ -706,3 +706,234 @@ const isEmailAllowed = (email, whitelist) => {
 **Why not in system prompt?** The LLM could be instructed by malicious input to "ignore the whitelist" (prompt injection). Code-level validation cannot be overridden.
 
 **Seen in:** `native/tools.js` in `01_05_confirmation`
+
+---
+
+## 21. Agent State Machine
+
+**What it solves:** An agent that can pause mid-run (waiting for an external tool result, a human decision, or a child agent) needs a formal state model — not just a boolean "done/not-done". Illegal transitions (e.g. starting an already-running agent) must be caught.
+
+**States:**
+```
+pending → running → completed
+pending → running → waiting → running → completed
+pending → running → failed
+pending → running → cancelled
+```
+
+**Structure (pure functions, no side effects):**
+```ts
+// Each transition returns { ok: true, agent } | { ok: false, error }
+function startAgent(agent: Agent): TransitionResult {
+  if (agent.status !== 'pending') return { ok: false, error: `Cannot start: ${agent.status}` }
+  return { ok: true, agent: { ...agent, status: 'running', startedAt: new Date() } }
+}
+
+function waitForMany(agent: Agent, waiting: WaitingFor[]): TransitionResult {
+  if (agent.status !== 'running') return { ok: false, error: ... }
+  return { ok: true, agent: { ...agent, status: 'waiting', waitingFor: waiting } }
+}
+```
+
+**`waiting` state enables:**
+- HTTP API returns `202 Accepted` with `waitingFor` list
+- External caller later POSTs to `/api/chat/agents/:id/deliver`
+- Agent resumes with the delivered result
+
+**Seen in:** `domain/agent.ts` in `01_05_agent`
+
+---
+
+## 22. Event-Driven Observability (Observer Pattern)
+
+**What it solves:** LLM calls, tool executions, and agent lifecycle events need to be logged and monitored — but logging/tracing code shouldn't be scattered throughout business logic.
+
+**Structure:**
+```ts
+// Runner emits events at key points:
+runtime.events.emit({ type: 'tool.called', ctx, callId, name, arguments })
+runtime.events.emit({ type: 'generation.completed', ctx, model, input, output, usage, durationMs })
+runtime.events.emit({ type: 'agent.completed', ctx, durationMs, usage })
+
+// Subscribers react independently:
+subscribeEventLogger(events)  // → structured stdout logs
+subscribeLangfuse(events)     // → Langfuse cloud dashboard
+
+// Subscribe to all events with wildcard:
+events.onAny((event) => { ... })
+// Subscribe to specific type:
+events.on('tool.called', (event) => { ... })
+```
+
+**EventContext on every event:**
+```ts
+interface EventContext {
+  traceId: TraceId       // shared across entire conversation (for correlation)
+  sessionId, agentId, rootAgentId, depth
+}
+```
+
+**Rule:** Payloads are self-contained — `generation.completed` includes full input/output/usage. Subscribers never call back into the runner. They receive everything they need in the event.
+
+**Seen in:** `events/` + `lib/event-logger.ts` + `lib/langfuse-subscriber.ts` in `01_05_agent`
+
+---
+
+## 23. Provider Abstraction (Common Interface)
+
+**What it solves:** Different LLM providers (OpenAI, Gemini) have different API formats, authentication, tool definitions, and streaming protocols. Business logic shouldn't know which provider it's using.
+
+**Structure:**
+```ts
+// Common interface:
+interface Provider {
+  generate(request: ProviderRequest): Promise<ProviderResponse>
+  stream(request: ProviderRequest): AsyncIterable<ProviderStreamEvent>
+}
+
+// Model routing: "openai:gpt-4.1" → resolveProvider() → { provider, model }
+const { provider, model } = resolveProvider(agent.config.model)
+const response = await provider.generate({ model, instructions, input, tools })
+// ↑ same call whether OpenAI or Gemini
+```
+
+**Input/output are normalized to common types.** Adapters handle all translation:
+- OpenAI: Responses API format (`input` array, `output` array)
+- Gemini: Interactions API format (`contents`, `candidates`)
+
+**Web search as native:** `{ type: 'web_search' }` → OpenAI: `web_search_preview` tool / Gemini: `google_search` tool. Translated by each adapter.
+
+**Lesson:** "Wspólny interfejs dla wielu providerów" — this is the direct implementation.
+
+**Seen in:** `providers/` in `01_05_agent`
+
+---
+
+## 24. Multi-Agent Delegation (Agent Spawning)
+
+**What it solves:** Complex tasks benefit from specialized agents. Alice orchestrates, Bob researches. The parent agent calls `delegate({ agent: "bob", task: "..." })` — the runner spawns Bob as a child agent and feeds his result back to Alice.
+
+**Structure:**
+```
+Alice calls: delegate({ agent: "bob", task: "Find price of gold" })
+  ↓
+runner.handleDelegation():
+  1. Depth guard: exec.depth + 1 <= MAX_AGENT_DEPTH (5)
+  2. Load bob.agent.md from disk
+  3. Create Bob in DB: { parentId: alice.id, sourceCallId, depth: 1, traceId: same }
+  4. Create Bob's first message: { role: "user", content: task }
+  5. Run Bob recursively (same runner)
+  6. Bob completes → result stored as function_call_output for Alice's call
+  7. Alice continues with Bob's result
+```
+
+**Hierarchy stored in DB:**
+```ts
+{ rootAgentId: alice.id, parentId: alice.id, sourceCallId: callId, depth: 1 }
+```
+
+**Depth guard prevents infinite recursion** — hard limit in code, not in prompt.
+
+**traceId shared across parent+child** → Langfuse shows full nested trace.
+
+**Seen in:** `runtime/runner.ts` `handleDelegation()` + `tools/definitions/delegate.ts` in `01_05_agent`
+
+---
+
+## 25. Context Pruning + Summarization
+
+**What it solves:** Long conversations exceed the model's context window. When estimated tokens pass a threshold, old items are dropped. To preserve information, the dropped items are summarized by the LLM and injected back as a system message.
+
+**Structure:**
+```ts
+// Before every LLM call:
+if (needsPruning(items, task, model.contextWindow, model.pruning.threshold)) {
+  const pruneResult = pruneConversation(items, task, contextWindow, pruning)
+  // keeps: task description + most recent turns
+  // drops: middle of conversation
+
+  if (enableSummarization && pruneResult.droppedItems.length > 0) {
+    summary = await generateSummary(provider, model, droppedItems, session.summary)
+    await repositories.sessions.update({ ...session, summary })
+  }
+
+  prunedItems = pruneResult.items
+}
+
+// Inject summary at top of context:
+if (session.summary) {
+  input.unshift({
+    type: 'message',
+    role: 'system',
+    content: `[Context Summary — Earlier conversation was compacted]\n\n${session.summary}`,
+  })
+}
+```
+
+**Token estimation:**
+```ts
+const CHARS_PER_TOKEN = 3.5  // lesson's "chars/4" heuristic, slightly conservative
+estimateTokens(text) = Math.ceil(text.length / 3.5)
+```
+
+**Lesson:** "wstępna estymacja tokenów poprzez zastosowanie uproszczenia chars / 4" and "można uruchamiać akcje związane z kompresją już przy około 30% zużycia."
+
+**Seen in:** `utils/pruning.ts`, `utils/summarization.ts`, `utils/tokens.ts` in `01_05_agent`
+
+---
+
+## 26. Agent-as-Markdown Template
+
+**What it solves:** Agent behavior should be configurable without code changes. Markdown files are human-readable, version-controllable, and editable by non-developers.
+
+**Structure:**
+```markdown
+---
+name: alice
+model: openai:gpt-4.1
+tools:
+  - calculator
+  - delegate
+  - files__fs_read
+---
+
+You are Alice, a helpful AI assistant...
+```
+
+YAML frontmatter (between `---`) = config. Body = system prompt.
+
+**Read fresh on every request** — edit file, next request picks it up immediately. No restart.
+
+**Tool naming convention:**
+- `calculator` → built-in tool registry
+- `web_search` → provider-native
+- `files__fs_read` → MCP: server=files, tool=fs_read (double underscore separator)
+
+**Seen in:** `workspace/agents/*.agent.md` + `workspace/loader.ts` in `01_05_agent`
+
+---
+
+## 27. Repository Pattern (Swappable Data Layer)
+
+**What it solves:** Business logic (runner, routes) should not depend on a specific database. Swapping from SQLite to PostgreSQL, or using in-memory storage for tests, should require zero changes to business logic.
+
+**Structure:**
+```ts
+// Interface:
+interface ItemRepository {
+  create(agentId: AgentId, data: NewItemData): Promise<Item>
+  listByAgent(agentId: AgentId): Promise<Item[]>
+  // ...
+}
+
+// Two implementations, same interface:
+createSQLiteRepositories({ url })  // production: Drizzle + SQLite
+createMemoryRepositories()          // testing: in-memory Maps
+```
+
+```ts
+// Business logic only touches the interface — never the implementation:
+const items = await runtime.repositories.items.listByAgent(agent.id)
+```
+
+**Seen in:** `repositories/` in `01_05_agent`

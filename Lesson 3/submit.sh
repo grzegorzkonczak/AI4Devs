@@ -1,0 +1,1 @@
+curl -X POST https://hub.ag3nts.org/verify -H "Content-Type: application/json" -d '{"apikey":"4abb691a-12aa-4546-82c5-1b6ba1c19f60","task":"proxy","answer":{"url":"https://singer-rebuilt-deluxe.ngrok-free.dev/","sessionID":"abc123"}}'

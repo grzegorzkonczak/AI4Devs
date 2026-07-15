@@ -88,7 +88,8 @@ const handlers = {
     const text = await res.text()
     console.log(`[fetch_items] Raw CSV:\n${text}`)
     const items = parseCsv(text)
-    console.log(`[fetch_items] Parsed ${items.length} items`)
+    console.log(`[fetch_items] Parsed ${items.length} items:`)
+    items.forEach(item => console.log(`   • ${item.id}: ${item.description ?? item.name}`))
     return items
   },
 
@@ -100,53 +101,63 @@ const handlers = {
     }
 
     // Step 1: reset budget
-    console.log('\n[test_prompt] Step 1: Resetting budget...')
-    await callHub({ answer: { prompt: 'reset' } }, 'RESET')
+    console.log('\n[test_prompt] ── Starting new test cycle ──────────────────────────')
+    console.log('[test_prompt] Step 1: Resetting budget...')
+    const resetResp = await callHub({ answer: { prompt: 'reset' } }, 'RESET')
+    console.log(`[test_prompt] Reset response: ${JSON.stringify(resetResp)}`)
 
     // Step 2: fetch fresh items
-    console.log('[test_prompt] Step 2: Fetching fresh items...')
+    console.log('\n[test_prompt] Step 2: Fetching fresh items...')
     const res = await fetch(CSV_URL)
     if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`)
     const items = parseCsv(await res.text())
     console.log(`[test_prompt] Got ${items.length} items`)
 
     // Step 3: test each item
-    console.log('[test_prompt] Step 3: Testing all items...')
+    console.log('\n[test_prompt] Step 3: Testing prompt against all items...')
+    console.log(`[test_prompt] Template: "${prompt_template}"\n`)
     const results = []
     let flag = null
 
-    for (const item of items) {
-      const prompt = prompt_template
-        .replace('{id}', item.id ?? item['id'] ?? '')
-        .replace('{description}', item.description ?? item['description'] ?? item['name'] ?? '')
+    for (const [idx, item] of items.entries()) {
+      const id = item.id ?? ''
+      const description = item.description ?? item.name ?? ''
+      const prompt = prompt_template.replace('{id}', id).replace('{description}', description)
 
-      console.log(`\n  [item ${item.id}] prompt: "${prompt}"`)
-      const response = await callHub({ answer: { prompt } }, `item ${item.id}`)
+      console.log(`\n  [${idx + 1}/10] Item: ${id} — "${description}"`)
+      console.log(`  [${idx + 1}/10] Prompt sent: "${prompt}"`)
 
-      // Extract flag if present
-      if (response.message && response.message.includes('{FLG:')) {
+      const response = await callHub({ answer: { prompt } }, `item ${id}`)
+
+      if (response.message && String(response.message).includes('{FLG:')) {
         flag = response.message
+        console.log(`\n  🚩 FLAG RECEIVED: ${flag}`)
       }
 
-      results.push({
-        id: item.id,
-        description: item.description ?? item['name'],
-        prompt_sent: prompt,
-        response,
-        ok: response.ok === true || response.code === 0,
-      })
+      const ok = response.ok === true || response.code === 0
+      console.log(`  [${idx + 1}/10] Result: ${ok ? '✅ PASS' : '❌ FAIL'} — ${JSON.stringify(response)}`)
+
+      results.push({ id, description, prompt_sent: prompt, response, ok })
     }
 
     const allCorrect = results.every(r => r.ok)
+    const passed = results.filter(r => r.ok).length
+    const failed = results.filter(r => !r.ok)
+
+    console.log(`\n[test_prompt] ── Cycle summary: ${passed}/10 correct ────────────────`)
+    if (failed.length > 0) {
+      console.log('[test_prompt] Failed items:')
+      failed.forEach(r => console.log(`   ❌ ${r.id} ("${r.description}") → ${JSON.stringify(r.response)}`))
+    }
+    if (flag) console.log(`[test_prompt] 🎉 FLAG: ${flag}`)
+    console.log('[test_prompt] ──────────────────────────────────────────────────────\n')
+
     return {
       allCorrect,
       flag,
-      results: results.map(r => ({
-        id: r.id,
-        description: r.description,
-        ok: r.ok,
-        response: r.response,
-      })),
+      passed,
+      total: items.length,
+      results: results.map(r => ({ id: r.id, description: r.description, ok: r.ok, response: r.response })),
     }
   },
 }

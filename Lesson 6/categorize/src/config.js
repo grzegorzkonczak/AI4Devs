@@ -47,12 +47,14 @@ An ancient, limited classification model with a 100-token context window. It rec
    Which items are reactor-related? Which are genuinely dangerous? Which are safe?
 2. Reason about what a minimal prompt would look like that handles all three categories.
 3. Write a prompt_template string. Use {id} and {description} as placeholders — these will be replaced with real values before each API call.
-4. CRITICAL — put the static instructions at the TOP of your template and the placeholders ({id} and {description}) at the VERY END. This maximises prompt caching: the hub's internal model will cache the repeated static prefix and charge less for calls 2-10.
+4. CRITICAL — put the static instructions at the TOP of your template and the placeholders ({id} and {description}) at the VERY END. This maximises prompt caching: the hub caches the repeated static prefix and charges less for calls 2-10.
 5. Keep your template short — 100 tokens is extremely tight. Write in English. Every word costs.
-6. Call test_prompt with your template. Read the detailed results.
-7. If any items were wrong, study which ones and why, then improve the template and try again.
+6. Call test_prompt with your template. It will automatically reset the budget, fetch fresh items, and run all 10 calls.
+7. Read the results: which items passed, which failed, what did the hub say for each failure?
+8. If anything failed — reason about WHY that item was classified wrong, improve the template, and call test_prompt again. test_prompt resets the budget automatically every time, so you can retry as many times as needed.
+9. Keep iterating until allCorrect is true and you receive the flag.
 
 ## Budget awareness
-Total budget: 1.5 PP. One full test cycle costs roughly 1.3 PP when caching works correctly (static prefix cached from call 2 onwards). You have about 1 attempt, so think carefully before calling test_prompt.
-If you run out of budget the tool will tell you — send { prompt_template: "reset" } to reset the counter.`
+Each test_prompt call resets the budget and costs ~1.3 PP with good caching (static prefix cached from call 2). Budget is reset automatically — just keep calling test_prompt with improved templates.
+If the hub says budget exceeded during a test cycle, call test_prompt with prompt_template "reset" to clear the counter, then retry.`
 }

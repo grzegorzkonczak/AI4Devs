@@ -83,12 +83,30 @@ Tool definitions require precise `name`, `description`, and `parameters` schema 
 
 ## Exercise coding style (IMPORTANT)
 
+### ⚠️ Course philosophy — ALWAYS apply this
+
+This is a course about **using AI and building agentic applications**. Every exercise solution MUST be built with an LLM/agentic approach from the start. **Never reach for deterministic/hardcoded logic when the point of the exercise is to practice AI utilisation.**
+
+Ask yourself before writing any code: *"Is an LLM making decisions here, or am I just scripting?"*
+
+- ✅ LLM reads API docs from `help` response and decides what to call → agentic
+- ✅ LLM classifies, routes, evaluates, plans → agentic  
+- ❌ Hardcoded sequence of API calls → deterministic, defeats the purpose
+- ❌ `if/else` chains deciding what to do next → deterministic, defeats the purpose
+
+Deterministic code is fine for **mechanics** (retrying 503s, sleeping on rate limits, parsing JSON) — things that don't require reasoning. But the **decisions** must go through the LLM.
+
+The Lesson 5 railway exercise is the canonical example: the agent read `help`, deduced the 3-step sequence, and executed it — all from a single goal-oriented prompt. No hardcoded steps.
+
+### Tool pattern
+
 When building exercise solutions, follow the proper agent tool pattern used in course examples:
 - Wrap capabilities as **named tool objects** with `{ type, name, description, parameters }` definition + a handler function
 - Separate tool **definitions** (what the model sees) from tool **handlers** (what actually runs)
 - Use a `toolHandlers` / `nativeHandlers` map: `{ toolName: async (args) => result }`
 - Route by checking tool name: `isNativeTool(name) ? executeNativeTool() : callMcpTool()`
 - This pattern scales — adding a new capability is just adding one entry to definitions and one to handlers
+
 
 
 

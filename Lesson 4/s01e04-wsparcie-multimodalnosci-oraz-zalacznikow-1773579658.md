@@ -1,4 +1,4 @@
----
+﻿---
 title: Wsparcie multimodalności oraz załączników
 space_id: 2476415
 status: scheduled
@@ -19,7 +19,7 @@ Benchmarki w ostatnich latach pokazały, że ich skuteczność jest bardzo ogra
 
 Całkiem dobrym miejscem z rankingami modeli jest strona [Artificial Analysis](https://artificialanalysis.ai/image/leaderboard/text-to-image). Znajdziemy na niej chociażby porównanie aktualnych LLM z których GPT-5.2, Claude Opus 4.5 i Gemini 3 Pro znajdują się na podium. To który z nich rzeczywiście zasługuje na Top1 to kwestia dość subiektywna, jednak nadal trend jest poprawny.
 
-![](https://cloud.overment.com/2026-01-30/ai_devs_4_models-af74cc17-f.png)
+![](images/ai_devs_4_models-af74cc17-f.png)
 
 Analogicznie wygląda to w przypadku modeli do generowania obrazu, gdzie Top3 to Gemini 3 (Nano Banana), GPT-Image-1 oraz Flux. A w przypadku wideo obecnie na szczycie mamy Grok 4 oraz Kling 2.5. Poza skutecznością modelu będzie interesować nas jeszcze **szybkość działania** oraz **cena**, a niekiedy także poziom prywatności API bądź możliwość uruchomienia modelu lokalnie (np. Qwen).
 
@@ -31,13 +31,13 @@ Podczas interakcji z agentem AI możemy dodawać różnego rodzaju **załącznik
 
 Zacznijmy od zrozumienia sposobu w jaki API umożliwia nam przesyłanie obrazów na potrzeby analizy (vision) bądź generowania/edycji (image generation). Poniżej widzimy interakcję w której **zdjęcie zostaje dołączone do wiadomości użytkownika** i trafia do modelu razem z treścią pytania. Następnie jeśli użytkownik zada kolejne pytanie w tym wątku, obraz **ponownie zostaje przesłany do modelu** (technicznie rzecz biorąc nadal znajduje się w pierwszej wiadomości, ale podkreśliłem jego obecność na wizualizacji).
 
-![Przykład interakcji z LLM z analizą obrazu](https://cloud.overment.com/2026-01-30/ai_devs_4_images-ff4c6b12-c.png)
+![Przykład interakcji z LLM z analizą obrazu](images/ai_devs_4_images-ff4c6b12-c.png)
 
 Obrazy przesyłane są w formie **URL** bądź **Base64**, jednak w obu przypadkach trafiają one do modelu w takiej samej formie i LLM **nie jest w stanie "zobaczyć" adresu URL**, co stanowi pewne wyzwanie, bo agent nie może odwołać się do pliku na potrzeby narzędzi bądź przekazywania go innym agentom.
 
 Ten sam problem dotyczy wszystkich innych form załączników, w tym także plików audio, wideo czy dokumentów tekstowych. Co więcej, żadne z dostępnych API wydaje się nie adresować tego problemu wprost. Nie spotkałem się też z żadnymi materiałami o **dobrych praktykach** w takiej sytuacji, ale podzielę się podejściem które sprawdza się w moich systemach. Polega ono na przekazaniu w wiadomości użytkownika nie tylko treści pytania oraz pliku, ale także dodatkowego elementu zawierającego odnośnik który agent może wykorzystać. Obrazuje to poniższy schemat:
 
-![Przykład informowania agenta o dostępnych załącznikach](https://cloud.overment.com/2026-01-31/ai_devs_4_media-8a380b30-f.png)
+![Przykład informowania agenta o dostępnych załącznikach](images/ai_devs_4_media-8a380b30-f.png)
 
 Widzimy na nim:
 
@@ -71,7 +71,7 @@ Fakt, że mówimy tutaj o dynamicznych danych sprawia, że potrzebujemy tutaj ag
 
 Jest to znacząca różnica pomiędzy tym, co znamy z klasycznego programowania. Tutaj **znaczną część aktywności przenosimy na model**, stwarzając agentowi **przestrzeń** do działania. Nawet bez wczytywania się w detale poniższego schematu od razu widać różnicę pomiędzy tymi dwoma podejściami.
 
-![Porównanie instrukcji agenta - specyficzna vs zgeneralizowana](https://cloud.overment.com/2026-01-31/ai_devs_4_workflow_vs_agent_prompt-e6d3474f-7.png)
+![Porównanie instrukcji agenta - specyficzna vs zgeneralizowana](images/ai_devs_4_workflow_vs_agent_prompt-e6d3474f-7.png)
 
 W przykładzie **[01\_04\_image\_recognition](https://github.com/i-am-alice/4th-devs/tree/main/01_04_image_recognition)** znajduje się agent wyposażony w dwa rodzaje narzędzi: **dostęp do systemu plików przez Files MCP** oraz **dedykowane narzędzie do analizy obrazu**. Po uruchomieniu skryptu agent rozpocznie przeszukiwania katalogu **knowledge** oraz **image**, a następnie zorganizuje pliki poprzez utworzenie kopii obrazów w katalogu **image/organized**.
 
@@ -89,7 +89,7 @@ Agenci AI mogą tworzyć obrazy nie tylko poprzez modele, ale także przez pis
 
 W przykładzie **[01\_04\_image\_editing](https://github.com/i-am-alice/4th-devs/tree/main/01_04_image_editing)** mamy kod agenta wyposażonego w narzędzia do **interakcji z systemem plików, generowaniem / edycją obrazów** oraz **analizą obrazu**. Jego instrukcja systemowa domyślnie sprawia, że przy generowaniu obrazu posługuje się wytycznymi z pliku style-guide.md o ile użytkownik wprost nie powie, aby z niego nie korzystał. Agent po otrzymaniu prośby od użytkownika ma możliwość **dopytania o szczegóły** przed wygenerowaniem grafiki oraz **podjęciem kilku prób** generowania, jeśli tworzone obrazy nie są zgodne z założeniami i opisami stylu.
 
-![Wizualizacja logiki agenta do generowania i edycji obrazów](https://cloud.overment.com/2026-01-31/ai_devs_4_edit_loop-9eba627c-1.png)
+![Wizualizacja logiki agenta do generowania i edycji obrazów](images/ai_devs_4_edit_loop-9eba627c-1.png)
 
 Agent ten wykorzystuje wszystko, czego nauczyliśmy się do tej pory, czyli **obsługi systemu plików**, **personalizowanie narzędzi (augmented function call)**, **odwoływania do plików i dokumentów w narzędziach**. Teraz dodaliśmy do tego także analizowanie obrazów poprzez dedykowane narzędzia.
 
@@ -103,19 +103,19 @@ Tworzenie rozbudowanych instrukcji do generowania obrazów czy wideo w logice ap
 
 Modele generujące obrazy, posiadają nie tylko możliwość ich tworzenia, ale też wykorzystania bazowej wiedzy oraz informacji dostarczonych w kontekście konwersacji. To dlatego Gemini 3 Pro jest w stanie stworzyć komiks obrazujący wyjaśnienie jednego z memów. Wygląda to imponująco **dopóki nie przyjrzymy się ostatniej wizualizacji**.
 
-![Generowane obrazy w oparciu o ogólne zrozumienie świata](https://cloud.overment.com/2026-02-01/ai_devs_4_explain-6afb8139-f.jpeg)
+![Generowane obrazy w oparciu o ogólne zrozumienie świata](images/ai_devs_4_explain-6afb8139-f.jpeg)
 
 Jest to poważny problem najnowszych modeli, ponieważ takie "glitch'e" potrafią być bardzo subtelne i trudne do zauważenia, szczególnie gdy 95% detali jest poprawna. Warto o tym pamiętać, bo halucynacje występują nie tylko przy generowaniu tekstu.
 
 Tymczasem zobaczmy drugi przykład agenta zdolnego do generowania spójnych obrazów, opierającego instrukcję o obiekty JSON. Agent ten posiada dostęp do szablonów, np. **template.json**, które może **klonować** do nowego katalogu, a następnie **precyzyjnie edytować** tylko te fragmenty, które muszą ulec zmianie. Zmodyfikowany w ten sposób szablon zostaje przekazany do narzędzia generującego obraz w formie **referencji**, przez co agent nie musi przepisywać całego dokumentu, a jedynie wskazać jego nazwę.
 
-![Generowanie obrazów z JSON prompt](https://cloud.overment.com/2026-02-01/ai_devs_4_json_image-18dae8a4-6.png)
+![Generowanie obrazów z JSON prompt](images/ai_devs_4_json_image-18dae8a4-6.png)
 
 Jest to więc kolejny przykład **połączenia różnych technik** dostępu do systemu plików oraz zwinnego przekazywania treści pomiędzy wykonaniem narzędzi. Poza tym zastosowanie formatu JSON pozwala na precyzyjną podmianę albo generowanego obiektu, albo ustawień "sceny". Kod tego przykładu znajduje się w katalogu **[01\_04\_json\_image](https://github.com/i-am-alice/4th-devs/tree/main/01_04_json_image)**.
 
 Wspomniałem, że grafiki generowane są na podstawie szablonu **template.json**, którego zawartość jest dość obszerna. Nietrudno domyślić się, że została wygenerowana przez AI na podstawie krótkiego opisu. Jednak szablon ten może też powstać na podstawie obrazów, przez co nasz agent "nauczy" się danego stylu. Dobrze jest tutaj utworzyć **dedykowaną umiejętność** do generowania szablonów na podstawie zdjęć ale i tak zwykle będzie wymagać to przynajmniej kilku iteracji.
 
-![Agent 'uczący' się stylu generowania grafik](https://cloud.overment.com/2026-02-01/ai_devs_4_template_json-f2bb05d1-d.png)
+![Agent 'uczący' się stylu generowania grafik](images/ai_devs_4_template_json-f2bb05d1-d.png)
 
 Powyższy przykład pokazuje to, jak bardzo dynamiczny może być agent wykorzystujący system plików. Aktualnie precyzyjne "klonowanie" stylu z obrazów nie zawsze będzie w zasięgu autonomicznego agenta, ale przy wsparciu ze strony człowieka, możemy uzyskać bardzo użyteczne rezultaty.
 
@@ -125,7 +125,7 @@ Generowanie grafik może odbywać się nie tylko na podstawie tekstu, lecz takż
 
 Poniżej widzimy, jak agent wykorzystuje **grafikę referencyjną** prezentującą idącą postać. Jej treść ma bezpośredni wpływ na rezultat i w połączeniu z JSON Prompt pozwala zachować spójność postaci w różnych scenach.
 
-![](https://cloud.overment.com/2026-02-01/ai_devs_4_template_pose-07733934-8.png)
+![](images/ai_devs_4_template_pose-07733934-8.png)
 
 Kod agenta **[01\_04\_image\_guidance](https://github.com/i-am-alice/4th-devs/tree/main/01_04_image_guidance)** w większości pozostaje niezmieniony w porównaniu z wcześniejszymi przykładami. Zmienione zostały jego instrukcje, a w folderze **references** pojawiły się grafiki prezentujące przykładowe pozy.
 
@@ -146,7 +146,7 @@ W praktyce, agent ten może operować zarówno na plikach lokalnych jak i genero
 
 Jeśli więc poprosimy agenta o np. przygotowanie dokumentu prezentującego 4 pozycje Kata z Karate, to agent poprawnie zidentyfikuje wszystkie niezbędne akcje, a następnie wykona je, przesyłając nam finalny dokument.
 
-![Generowanie dokumentów przez agentów AI](https://cloud.overment.com/2026-02-01/ai_devs_4_docs_generation-66fca7a7-7.png)
+![Generowanie dokumentów przez agentów AI](images/ai_devs_4_docs_generation-66fca7a7-7.png)
 
 Co więcej, jeśli w pliku pojawią się problemy, np. ze stylowaniem, treścią czy błędnymi obrazkami, agent będzie mógł nanieść poprawki bez potrzeby rozpoczynania całej pracy od podstaw. Generowane w ten sposób materiały mogą być potem przesłane mailem, dołączone do dysku Google albo przekazane do innych agentów, wyspecjalizowanych np. w tłumaczeniach czy weryfikacji poprawności treści.
 
@@ -182,11 +182,11 @@ W przykładzie **[01\_04\_audio](https://github.com/i-am-alice/4th-devs/tree/mai
 - Udzielania odpowiedzi audio, które mogą być załącznikami maili bądź wiadomości w komunikatorach
 - Udzielania wskazówek dotyczących stylu wypowiedzi i akcentu (choć tutaj pojawiają się halucynacje)
 
-![Przykład interakcji audio pomiędzy użytkownikiem, a agentem AI](https://cloud.overment.com/2026-02-02/ai_devs_4_audio_processing-a7882346-c.png)
+![Przykład interakcji audio pomiędzy użytkownikiem, a agentem AI](images/ai_devs_4_audio_processing-a7882346-c.png)
 
 Poziom interakcji i rozpoznawania audio może obejmować zaawansowane analizy przydatne w pracy nad nagraniami rozmów sprzedażowych czy w nauce. Poniżej znajduje się przykład obrazujący cechy mojej krótkiej wypowiedzi opisanej przez tego samego agenta. Sugeruje on nawet zdolność modelu do diaryzacji, czyli rozpoznawania rozmówców.
 
-![](https://cloud.overment.com/2026-02-02/ai_devs_analysis-77dcbd62-a.png)
+![](images/ai_devs_analysis-77dcbd62-a.png)
 
 Podczas pracy z formatem audio, warto także zadbać o odpowiedni styl wypowiedzi modelu, w celu uniknięcia **dyktowania adresów URL**, wykorzystywania tabel czy zaawansowanego formatowania, którego nie da się skutecznie przekazać wyłącznie poprzez dźwięk.
 
@@ -198,7 +198,7 @@ Jednym z najbardziej użytecznych zastosowań analizy wideo, jest możliwość 
 
 Poniżej znajduje się przykład odpowiedzi agenta, który sprowadził film [Claude AI Co-founder Publishes 4 Big Claims about Near Future: Breakdown](https://www.youtube.com/watch?v=Iar4yweKGoI) do zaledwie czterech punktów.
 
-![Przykład agenta odpowiadającego na pytania dotyczące filmu YouTube](https://cloud.overment.com/2026-02-02/ai_devs_4_video_analysis-9f528c00-1.png)
+![Przykład agenta odpowiadającego na pytania dotyczące filmu YouTube](images/ai_devs_4_video_analysis-9f528c00-1.png)
 
 Analogicznie można pracować z plikami .mp4, .mpeg czy .mov, więc w tym przypadku pomocne jest także nawigowanie po systemie plików (co agent potrafi przez polecenia shell, bądź omawiany Files MCP). Poza tym warto także uwzględnić optymalizację plików audio/video w celu zmniejszenia kosztów oraz czasu przetwarzania. W niektórych przypadkach sprawdzi się także przyspieszenie nagrania, o ile tylko nie utracimy w ten sposób istotnych szczegółów.
 
@@ -210,7 +210,7 @@ Oprócz analizy wideo mamy dzisiaj również możliwość generowania filmów za
 
 W związku z tym, że mamy tu do czynienia z agentem, niekiedy otrzymamy prośbę o doprecyzowanie instrukcji bądź weryfikację wygenerowanych obrazów.
 
-![Przykład interakcji z agentem zdolnym do generowania filmów na podstawie obrazów](https://cloud.overment.com/2026-02-02/ai_devs_4_video_agent-3df4c800-7.png)
+![Przykład interakcji z agentem zdolnym do generowania filmów na podstawie obrazów](images/ai_devs_4_video_agent-3df4c800-7.png)
 
 Fakt, że posiadamy tutaj dużą kontrolę nad przebiegiem procesu generowania, w tym także utrzymaniem spójności pomiędzy obrazami (bo agent może generować kolejne klatki, wykorzystując poprzednie jako referencje) sprawia, że możliwe jest generowanie nawet dłuższych filmów. Pomimo tego, że model Kling ograniczony jest jedynie do 10 sekund, to nic nie stoi na przeszkodzie, aby ostatnia klatka filmu została wykorzystana jako pierwsza dla kolejnego fragmentu. Tutaj jedynym brakującym elementem, jest narzędzie pozwalające agentowi połączyć wygenerowane nagrania, ale na tym etapie nie powinno to stanowić już wyzwania.
 

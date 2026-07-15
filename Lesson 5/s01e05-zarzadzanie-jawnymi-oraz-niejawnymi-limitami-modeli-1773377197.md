@@ -1,4 +1,4 @@
----
+﻿---
 title: Zarządzanie jawnymi oraz niejawnymi limitami modeli
 space_id: 2476415
 status: scheduled
@@ -47,7 +47,7 @@ LLM sterujący logiką aplikacji będzie popełniał błędy. System powinien um
 
 Poniżej widzimy interakcję w której użytkownik prosi o **dodanie wydarzenia** z zaproszeniem wskazanej osoby na spotkanie. Jej adres jednak **nie znajduje się na liście dopuszczalnych kontaktów** i agent zostaje o tym poinformowany. W związku z tym decyduje się na **dodanie kontaktu**, ale to wymaga potwierdzenia ze strony użytkownika. Potwierdzenie to odbywa się poprzez **interfejs graficzny**, czyli **deterministyczną akcję**, która redukuje ryzyko pomyłki. Dodatkowo agent **nie określa "nadawcy"**, ponieważ sesja użytkownika zawiera już tę informację.
 
-![Adresowanie błędów i ograniczeń modeli przez architekturę systemu](https://cloud.overment.com/2026-02-03/ai_devs_4_recovery-22ebe239-f.png)
+![Adresowanie błędów i ograniczeń modeli przez architekturę systemu](images/ai_devs_4_recovery-22ebe239-f.png)
 
 Z powyższym przykładem jest jednak kilka problemów:
 
@@ -65,7 +65,7 @@ Mechanizm "zaufanych" akcji jest kluczowy dla komfortu użytkownika, ponieważ r
 - Narzędzie powinno być automatycznie **usunięte** z listy zaufanych jeśli zmieni się jego struktura - nazwa, opis, bądź schemat. Jest to **krytyczne** szczególnie w przypadku serwerów MCP, których interfejs może zmienić się **bez wiedzy użytkownika (!)**
 - Zatwierdzenie bądź odrzucenie akcji **musi być deterministyczne** i odbywać się przez kod, a nie decyzję LLM.
 
-![Przykład mechanizmu zaufanych narzędzi](https://cloud.overment.com/2026-02-03/ai_devs_4_trust-b08030ef-c.png)
+![Przykład mechanizmu zaufanych narzędzi](images/ai_devs_4_trust-b08030ef-c.png)
 
 Na powyższych przykładach widzimy wyraźnie, że utrzymanie kontroli jest możliwe, ale jedynie do pewnego stopnia. Wszędzie tam, gdzie agent ma dostęp do danych i akcji, musimy brać pod uwagę, że coś może pójść nie tak i informacje z jednego źródła zostaną przekazane do drugiego. Dlatego problem ten musi być adresowany na poziomie założeń projektowych i jeśli przypadkowe przesłanie danych w niepożądane miejsce jest niedopuszczalne, a akceptacja ze strony użytkownika nie będzie wystarczająca, tam wdrożenie LLM jest **nierekomendowane**.
 
@@ -80,7 +80,7 @@ Na temat wydajności rozmawialiśmy już w S01E02 w kontekście optymalizacji na
 - **ograniczenie zapytań:** obecność modelu w aplikacji sprawia, że możemy sięgać po niego częściej, niż jest to potrzebne. Dlatego jeśli jakieś zadanie nie jest niezbędne, bądź może zostać zrealizowane inaczej ale z pomocą kodu, to powinniśmy z tego skorzystać i zawsze zadawać sobie pytanie "czy AI jest tutaj niezbędne?"
 - **ograniczenia tokenów:** podczas interakcji z LLM, wydajność jest uzależniona od liczby tokenów wejściowych oraz wyjściowych. W praktyce, niemal zawsze możliwe jest zmniejszenie ich ilości po obu stronach, albo poprzez Context Engineering albo przez Prompt Engineering i sterowanie zachowaniem modelu.
 
-![Optymalizacja systemów agentowych na poziomie architektury](https://cloud.overment.com/2026-02-04/ai_devs_4_agent_optimization-7d4138da-c.png)
+![Optymalizacja systemów agentowych na poziomie architektury](images/ai_devs_4_agent_optimization-7d4138da-c.png)
 
 Powyższe punkty jasno sugerują, że (obecnie) **wydajność modeli** jest niska i musimy adresować ją na poziomie architektury aplikacji oraz projektowania doświadczeń użytkownika (UX). Połączenie tego z technikami optymalizacji samej interakcji z modelami o której rozmawialiśmy w S01E02 zwykle jest wystarczające. Jeśli jednak tak nie jest, nasza uwaga może skierować się w obszar **fine-tuningu** mniejszych modeli, bądź **[destylacji](https://openai.com/index/api-model-distillation/)** tych większych. W obu przypadkach mówimy o optymalizacji na poziomie samego modelu. Techniki te są jednak jeszcze dość rzadko stosowane, chociażby ze względu na fakt, że cena i szybkość działania modeli "Flash" (np. Gemini 3 Flash, Sonnet Haiku) okazują się wystarczające.
 
@@ -114,7 +114,7 @@ Moderacja treści oraz blokowanie potencjalnie niezgodnych z zasadami żądań m
 
 Filtrowanie zapytań nie zawsze będzie dotyczyło wyłącznie łamania prawa czy zasad dostawców. Niekiedy kluczowy będzie sam zakres działania systemu. Wówczas będzie nam zależało na określeniu, czy dana interakcja nie wykracza poza ustalone ramy. Możemy to zweryfikować za pomocą promptu, którego zadaniem będzie zwrócenie **ustrukturyzowanej odpowiedzi** opisującej dane wejściowe. Następnie, na podstawie otrzymanych właściwości, programistycznie decydujemy o dalszym przebiegu logiki.
 
-![Blokowanie zapytań naruszających zasady dostawców modeli bądź nasze wewnętrzne](https://cloud.overment.com/2026-02-04/ai_devs_4_moderation-6969de9a-e.png)
+![Blokowanie zapytań naruszających zasady dostawców modeli bądź nasze wewnętrzne](images/ai_devs_4_moderation-6969de9a-e.png)
 
 Jak zwykle należy mieć tutaj na uwadze **halucynacje modelu**, które mogą mieć wpływ na błędne klasyfikacje. Tutaj jednak nie możemy zrobić zbyt wiele, a jeśli stosujemy Moderation API, to zwykle będzie to wystarczające.
 
@@ -143,26 +143,26 @@ Wiele mówi się o różnych limitach umiejętności modeli językowych, jednak 
 
 Modele językowe aktualnie nie mogą generować treści w nieskończoność w pojedynczym zapytaniu, ponieważ limity wypowiedzi modelu wynoszą obecnie od 2 000 do 128 000 tokenów. Zatem jeśli model GPT-5.2 ma deklarowane okno wielkości **400k** tokenów, a limit tokenów wyjściowych wynosi **128k**, to przy ustawieniu parametru **max\_tokens** na najwyższą wartość, pozostanie nam "jedynie" 272k tokenów do wykorzystania.
 
-![Context Window Limit - Input / Output](https://cloud.overment.com/2026-02-04/ai_devs_4_context-6701c3fb-f.png)
+![Context Window Limit - Input / Output](images/ai_devs_4_context-6701c3fb-f.png)
 
 Przy większości pojedynczych zapytaniach, takie limity raczej nie są problemem i utrzymywanie domyślnych wartości oraz pomijanie estymacji tokenów jest w porządku. Natomiast dla złożonych interakcji, agentów oraz systemów wieloagentowych, kontrola liczby tokenów w kontekście staje się niezwykle istotna. Niestety nie jest to oczywiste, i obecnie najlepsze techniki obejmują:
 
 - wstępną estymację tokenów poprzez zastosowanie uproszczenia **chars / 4** (ponieważ 1 token to zwykle 3-4 litery w języku angielskim) oraz zachowanie bufora w formie około 20% limitu danego modelu.
 - po wysłaniu zapytania API zwraca odpowiedź z informacją o wykorzystanych tokenach zarówno dla danych wejściowych, jak i wyjściowych. Pozwala to na **doprecyzowanie wstępnej estymacji** oraz ewentualne dopasowanie właściwości **max\_tokens** przy zapytaniu.
 
-![Estymacja i kalkulacja liczby tokenów](https://cloud.overment.com/2026-02-04/ai_devs_4_estimation-fddcaa14-4.png)
+![Estymacja i kalkulacja liczby tokenów](images/ai_devs_4_estimation-fddcaa14-4.png)
 
 W zależności od aktualnej liczby tokenów dla danej interakcji, możemy uruchamiać akcje związane z kompresją, przesłanianiem bądź ekstrakcją informacji. Obecnie warto to robić bardzo wcześnie i pierwsze z nich mogą być uruchamiane już przy około 30% zużycia dostępnego limitu.
 
 Kolejnym wątkiem są wspominane już limity zapytań do API, które zwykle obejmują **zapytania na minutę** oraz **tokeny na minutę**. Informacje o nich uzyskujemy zwykle w nagłówkach odpowiedzi, na podstawie których wartości możemy zaadresować zbliżający się limit przy jednoczesnym poinformowaniu użytkownika o konieczności wydłużonego oczekiwania na odpowiedź.
 
-![Informacje o limitach API przesyłane w nagłówku](https://cloud.overment.com/2026-02-05/ai_devs_4_headers-9e708453-4.png)
+![Informacje o limitach API przesyłane w nagłówku](images/ai_devs_4_headers-9e708453-4.png)
 
 Na produkcji zawsze będzie nam zależało nie tylko na kontrolowaniu limitów danego providera, lecz także na narzuceniu ograniczeń samemu użytkownikowi. Przykładowo, jeśli jedna z funkcjonalności aplikacji wymaga interakcji z AI, to w celu uniknięcia jej zbyt częstego wywoływania, użytkownik powinien posiadać własny limit zapytań.
 
 W zależności od charakteru aplikacji którą tworzymy, może interesować nas ścisłe ograniczenie wydatków na danego użytkownika. Pod tym kątem świetnie sprawdza się wspominany już [OpenRouter](https://openrouter.ai/) w przypadku którego możemy programistycznie zarządzać kluczami użytkowników, generując indywidualne tokeny, które posiadają swoje własne limity.
 
-![Dedykowane tokeny użytkowników i limity](https://cloud.overment.com/2026-02-05/ai_devs_4_keys-3b2b0fd3-6.png)
+![Dedykowane tokeny użytkowników i limity](images/ai_devs_4_keys-3b2b0fd3-6.png)
 
 Zasadniczo wszędzie tam, gdzie udostępniamy akcje API w których logikę zaangażowany jest model, powinniśmy szczególnie dbać o ich zabezpieczenie przed zbyt dużą liczbą zapytań, bez względu na to czy wymagają one logowania czy są otwarte dla anonimowych użytkowników.
 
@@ -170,7 +170,7 @@ Zasadniczo wszędzie tam, gdzie udostępniamy akcje API w których logikę zaan
 
 Projekty takie jak **[json-render](https://github.com/vercel-labs/json-render)**, umożliwiające generowanie dynamicznych interfejsów, są prezentowane hasłami **guardrailed** i **predictable**, a niekiedy także **deterministic**. Na tym etapie powinno być jasne, że działanie tych interfejsów nie ma nic wspólnego ze 100% pewnością co do uzyskanych rezultatów. Chodzi o to, że **gwarancja struktury** nie oznacza **gwarancji wartości**, czyli nawet jeśli zwrócony obiekt JSON będzie mieć odpowiedni kształt, tak poszczególne wartości mogą być ustawione błędnie. Prosty przykład widzimy poniżej.
 
-![Przykład dynamicznego interfejsu, zawierającego błąd wartości](https://cloud.overment.com/2026-02-05/ai_devs_4_ui_render-7b0e75f4-8.png)
+![Przykład dynamicznego interfejsu, zawierającego błąd wartości](images/ai_devs_4_ui_render-7b0e75f4-8.png)
 
 Pomimo tego, że **struktura** wypowiedzi modelu została zachowana i pozwoliło to na renderowanie dynamicznego wykresu, tak prezentowane wartości są błędne, ale system nie był w stanie tego wykryć. W dodatku nawet jeśli generowana odpowiedź miałaby zostać **weryfikowana przez sam model**, to choć istnieje szansa na to, że błąd zostałby wykryty, tak dalej nie mamy pewności czy tak będzie.
 
@@ -178,7 +178,7 @@ Poziom halucynacji modeli spada w czasie, co sugerują chociażby publikacje tak
 
 Obecnie najłatwiej go zaobserwować w przypadku modeli takich jak Gemini Flash, gdzie w przypadku pytania o treść strony www model **w pełni halucynuje** odpowiedź, jedynie domyślając się jej treści na podstawie adresu URL oraz przypadkowych informacji z własnej bazy wiedzy. Jednocześnie model GPT-5.2 w tej samej sytuacji jasno mówi nam, że **nie posiada dostępu do danej strony www**.
 
-![](https://cloud.overment.com/2026-02-05/ai_devs_4_hallucination-69de4a35-0.png)
+![](images/ai_devs_4_hallucination-69de4a35-0.png)
 
 Podobne halucynacje mają miejsce także wtedy, gdy model **zamiast poprosić o doprecyzowanie zapytania**, jedynie zakłada, że wie o czym mówi. Przykładem może być uzupełnianie brakujących wartości przy wywołaniu narzędzi, na przykład poprzez "domyślenie się" adresu e-mail jedynie na podstawie nazwiska.
 
@@ -238,7 +238,7 @@ Poniższy schemat prezentuje szeroką perspektywę aplikacji i jej główne kom
 - Pełną integrację z systemem do monitorowania generatywnych aplikacji
 - Elastyczną architekturę umożliwiającą dynamiczny rozwój
 
-![Architektura agenta AI](https://cloud.overment.com/2026-02-05/ai_devs_4_agent_architecture-5d06a8b6-0.png)
+![Architektura agenta AI](images/ai_devs_4_agent_architecture-5d06a8b6-0.png)
 
 Zanim przejdziemy dalej, chciałbym podkreślić, że **powyższe komponenty** nie będą zawsze wymagane przy budowaniu systemów agentowych, albo w szczególności pojedynczych funkcjonalności w których część logiki musi być zrealizowana przez agenta. Jednocześnie w przypadku aplikacji produkcyjnych, przykład ten daje bardzo solidny wgląd w to, co potencjalnie możemy budować.
 
@@ -250,13 +250,13 @@ Przyjrzyjmy się zatem podstawowej konfiguracji aplikacji, oraz strukturze endp
 - API udostępnia także akcje pozwalające na autoryzację Serwerów MCP, które wymagają połączenia OAuth 2.1. Adres, którego rolą jest zainicjowanie procesu **jest publiczny**.
 - API naturalnie może udostępniać więcej akcji, powiązanych chociażby z rejestracją i zarządzaniem użytkownikami, bądź innymi elementami aplikacji. W naszym przykładzie jednak nie ma to obecnie miejsca.
 
-![Konfiguracja i struktura API](https://cloud.overment.com/2026-02-05/ai_devs_4_agent_endpoints-fc327318-6.png)
+![Konfiguracja i struktura API](images/ai_devs_4_agent_endpoints-fc327318-6.png)
 
 Zatem z punktu widzenia konfiguracji stosujemy tutaj wszystkie typowe techniki znane z klasycznych aplikacji, zwracając szczególną uwagę na endpointy, w których pojawia się model.
 
 Na tym etapie do gry wchodzi budowanie kontekstu oraz ustawień dla bieżącej interakcji. Agent ma tutaj formę **pliku markdown**, który zawiera ustawienia (nazwę, opis, model, narzędzia), a także wiadomość systemową. To także miejsce na zbudowanie listy narzędzi (zarówno dedykowanych jak i zewnętrznych z serwerów MCP) oraz utworzenie bądź wczytanie sesji.
 
-![Budowanie kontekstu i ustawień](https://cloud.overment.com/2026-02-06/ai_devs_4_assembly-756a88f3-8.png)
+![Budowanie kontekstu i ustawień](images/ai_devs_4_assembly-756a88f3-8.png)
 
 Dalej mamy pętlę agenta, czyli strukturę, która jest nam już znana. Tym razem kładziemy jednak nacisk na zdarzenia, do których możemy się podłączyć w celu ich monitorowania lub podejmowania konkretnych działań (na przykład kompresji kontekstu). Wśród zdarzeń wyróżniamy:
 
@@ -267,25 +267,25 @@ Dalej mamy pętlę agenta, czyli strukturę, która jest nam już znana. Tym raz
 - zdarzenia dotyczące wstrzymania i wznowienia działań
 - zdarzenia dotyczące błędów oraz anulowania interakcji
 
-![Pętla logiki agenta i związane z nią zdarzenia](https://cloud.overment.com/2026-02-05/ai_devs_4_agent_loop-08b445ed-f.png)
+![Pętla logiki agenta i związane z nią zdarzenia](images/ai_devs_4_agent_loop-08b445ed-f.png)
 
 Na uwagę w logice agenta zasługują przede wszystkim **dbałość o poprawne utrzymanie stanu** od którego w dużym stopniu zależy wykorzystanie prompt cache, oraz obsługa zdarzeń związanych z oczekiwaniem, anulowaniem oraz błędami. Logika którą widzimy powyżej to najważniejszy element aplikacji, od którego uzależnione są niemal wszystkie pozostałe. Dobrze jest więc go dobrze przemyśleć, szczególnie gdy strukturą będzie odbiegał od typowych założeń logiki agenta (np. w związku z naciskiem na dekompozycję czy rozbudowane struktury wieloagentowe).
 
 Następnym elementem aplikacji jest **ujednolicony interfejs** do komunikacji z różnymi providerami, co tym samym daje dostęp do różnych modeli i ich możliwości. Jak widać poniżej, zarówno API, jak i agent "rozmawiają tym samym językiem", ale warstwa tłumaczeń dba o poprawne przeniesienie interakcji na dany model. Poza tłumaczeniem struktur, dochodzi tu także do dostosowania ustawień takich jak limity kontekstu, czy wykluczenia niektórych funkcji ze względu na ograniczenia danego połączenia.
 
-![Wspólny interfejs dla wielu providerów](https://cloud.overment.com/2026-02-05/ai_devs_4_agent_translation-c1b82d83-a.png)
+![Wspólny interfejs dla wielu providerów](images/ai_devs_4_agent_translation-c1b82d83-a.png)
 
 Z praktycznego punktu widzenia, w tym miejscu można zastosować [OpenRouter](https://openrouter.ai/) i w wielu przypadkach będzie to wystarczające. Należy jednak pamiętać, że takie platformy **nie wspierają wszystkich funkcjonalności** oraz modeli. Bardzo szybko okazuje się, że dedykowane połączenia i tak są potrzebne. Co więcej, Gemini, Anthropic oraz OpenAI coraz częściej przedstawiają elementy API, które niemal **całkowicie blokują** możliwość "tłumaczenia" interakcji pomiędzy providerami. Jednocześnie problem ten nie ma znaczenia w przypadku systemów wieloagentowych, gdzie każdy z agentów może pracować z innym API.
 
 Ostatnim elementem spośród głównych komponentów aplikacji, jest system logów oraz monitorowanie działań agentów oraz komunikacji z użytkownikiem. W związku z tym, że mamy do czynienia z architekturą opartą o zdarzenia, to w dużym stopniu polegamy tu na ich subskrypcji. W tym miejscu otwieramy sobie także przestrzeń na moderowanie interakcji oraz ewentualne blokady.
 
-![Monitorowanie i logowanie aplikacji](https://cloud.overment.com/2026-02-05/ai_devs_4_agent_observability-495ca647-2.png)
+![Monitorowanie i logowanie aplikacji](images/ai_devs_4_agent_observability-495ca647-2.png)
 
 Monitorowanie aplikacji ma tutaj charakter dwupoziomowy, ponieważ jeden dotyczy klasycznego systemu logów, natomiast drugi skupia się wyłącznie na działaniach agenta.
 
 Zatem jeśli uruchomimy aplikację, a wcześniej uzupełnimy klucze **[OpenAI](https://platform.openai.com/api-keys)**, **[Gemini](https://aistudio.google.com/api-keys)** oraz ewentualnie [**Langfuse**](https://langfuse.com/) (bezpłatne konto), to możliwe będzie przesłanie poniższego zapytania. W związku z tym, że agent automatycznie połączy się z serwerem [Files MCP](https://github.com/iceener/files-stdio-mcp-server) o którym już wspominaliśmy, to możliwa będzie bardzo swobodna interakcja z plikami tekstowymi w katalogu **workspace**.
 
-![Przykładowe zapytanie API do 01\_05\_agent](https://cloud.overment.com/2026-02-06/ai_devs_4_request-9f3370a1-b.png)
+![Przykładowe zapytanie API do 01\_05\_agent](images/ai_devs_4_request-9f3370a1-b.png)
 
 (uwaga: powyższy klucz API jest poprawny i pochodzi z pliku **seed.ts**). Przed opublikowaniem aplikacji należy go zmienić).
 

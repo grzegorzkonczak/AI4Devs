@@ -1,4 +1,4 @@
----
+﻿---
 title: Projektowanie API dla efektywnej pracy z modelem
 space_id: 2476415
 status: scheduled
@@ -42,7 +42,7 @@ W oficjalnym serwerze [Filesystem MCP](https://github.com/modelcontextprotocol/s
 
 To całkiem sporo akcji, biorąc pod uwagę fakt, że mówimy tutaj o zaledwie jednym obszarze zadań: **interakcji z systemem plików**! Tymczasem agenci do kodowania (np. Cursor) pokazują nam, jak skutecznie modele LLM posługują się narzędziami takimi jak **grep** czy **ripgrep**. Sam dostęp do shella daje znacznie większe możliwości, lecz jest on zdecydowanie trudniejszy w konfiguracji i wdrożeniu na skalę produkcyjną bez sandboxów, które często przekładają się na wyższe koszty i zwiększają złożoność całego systemu.
 
-![Porównanie MCP z narzędziami Shell / CLI](https://cloud.overment.com/2026-01-27/ai_devs_4_fs_shell-6ed06a27-0.png)
+![Porównanie MCP z narzędziami Shell / CLI](images/ai_devs_4_fs_shell-6ed06a27-0.png)
 
 Na pierwszy rzut oka powyższy schemat jasno sugeruje, że wysiłek włożony w podłączenie sandbox'a powinien się opłacić. Natomiast nadal, nie zawsze będziemy mieć taką możliwość. W zamian, możemy skupić się na optymalizacji narzędzi z oficjalnego serwera Filesystem MCP.
 
@@ -60,7 +60,7 @@ Zestawiając je z listą narzędzi z Filesystem MCP:
 - **Write**: może zastąpić **write\_file** oraz **edit\_file**.
 - **Manage**: może zastąpić wszystkie akcje związane z tworzeniem i modyfikacją katalogów oraz plików, wliczając w to ich przenoszenie.
 
-![Optymalizacja rodzajów narzędzi i ich odpowiedzialności](https://cloud.overment.com/2026-01-27/aidevs_4_mcp_optimization-090c65f0-6.png)
+![Optymalizacja rodzajów narzędzi i ich odpowiedzialności](images/aidevs_4_mcp_optimization-090c65f0-6.png)
 
 Przy takiej "optymalizacji" narzędzi zawsze należy pamiętać o ich przejrzystości. Celem nie jest wyłącznie zmniejszenie liczby schematów, lecz odnalezienie właściwego balansu między dostępnymi akcjami a skutecznością ich obsługi przez model.
 
@@ -80,13 +80,13 @@ To wszystko pozwoli nam na ukształtowanie schematów, więc przejdźmy teraz pr
 
 Odczytywanie plików i katalogów działa w dwóch trybach, ale współdzieli strukturę parametrów. Po prostu niektóre z nich są ignorowane w zależności od trybu. Podobnie zachowuje się struktura odpowiedzi, ale tutaj pojawiają się już istotne różnice. Patrząc na te schematy, warto zwrócić uwagę na **proste nazwy** oraz **minimalną ilość danych** z opcją określania **trybu** oraz **detali**.
 
-![Szczegóły narzędzia FS Read](https://cloud.overment.com/2026-01-27/ai_devs_4_fsread-dacb713a-7.png)
+![Szczegóły narzędzia FS Read](images/ai_devs_4_fsread-dacb713a-7.png)
 
 Po stronie implementacji dzieje się dość dużo, ponieważ uwzględniamy różnego rodzaju sytuacje brzegowe oraz pomyłki modelu. W obu przypadkach zwracane są niezbędne informacje wraz z dynamicznie generowaną wskazówką, dzięki której agent potencjalnie wie, co należy zrobić dalej.
 
 Odpowiednio reagujemy na sytuacje w których dokumenty bądź katalogi zawierają zbyt dużo informacji albo gdy agent próbuje przekroczyć narzucone uprawnienia. Podobnie też stosujemy mechaniki wspierające eksplorowanie plików, np. rozwiązując ścieżkę do dokumentu w sytuacji gdy model poda jedynie jego nazwę.
 
-![Przykłady zachowań narzędzia fs\_read, obsługi błędów i sytuacji brzegowych](https://cloud.overment.com/2026-01-27/ai_devs_4_fs_read_cases-7dfea0be-1.png)
+![Przykłady zachowań narzędzia fs\_read, obsługi błędów i sytuacji brzegowych](images/ai_devs_4_fs_read_cases-7dfea0be-1.png)
 
 Oczywiście można dyskutować, czy warto było wyodrębnić narzędzia **fs\_read\_file** oraz **fs\_read\_directory** zamiast jednego **fs\_read**. Decyzję o tym można jednak podjąć indywidualnie, rozważając kontekst konkretnego projektu. W tym przypadku, pracując w ten sposób przez ostatnie miesiące (w nieco zmienionej formie), nie zauważyłem, aby LLM miał problem z ich obsługą.
 
@@ -96,21 +96,21 @@ W oparciu o to samo podejście powstało narzędzie **fs\_write**, jednak w tym
 
 Wiemy już, że **nie mamy możliwości zabezpieczenia się przed wszelkimi pomyłkami**, ale mamy możliwość minimalizowania ryzyka ich wystąpienia. Dlatego zastosowałem weryfikację **checksum** oraz opcję **dryRun**. Dzięki nim agent nie może nadpisać pliku, który został w międzyczasie zmieniony oraz może sprawdzić jak będzie wyglądał dokument po wprowadzaniu zmian.
 
-![Schemat narzędzia fs\_write](https://cloud.overment.com/2026-03-09/ai_devs_4_fs_write-4163dd85-b.png)
+![Schemat narzędzia fs\_write](images/ai_devs_4_fs_write-4163dd85-b.png)
 
 Poniższe przykłady użycia pokazują również odpowiednie podejście do informowania modelu o wynikach. Mogłoby się wydawać, że przy tworzeniu lub aktualizacji pliku zwracanie jego ścieżki nie jest konieczne. W praktyce jest to jednak istotne, aby **wzmocnić** zachowanie modelu, dzięki czemu będzie on w stanie wykorzystać zmodyfikowany plik w dalszych akcjach.
 
-![Przykłady użycia fs\_write](https://cloud.overment.com/2026-01-27/ai_devs_4_rswrite_cases-aee30a3e-9.png)
+![Przykłady użycia fs\_write](images/ai_devs_4_rswrite_cases-aee30a3e-9.png)
 
 W przypadku akcji „stratnych”, takich jak **zapisywanie** czy **edycja**, warto zadbać o możliwość przywrócenia błędnych modyfikacji. Powinno się to odbywać bez angażowania modelu, na przykład poprzez przechowywanie historii wprowadzanych zmian.
 
 Narzędzia **fs\_search** i **fs\_manage** budowane są według tych samych zasad. Dołączam jednak ich schematy do wglądu na poniższych grafikach, bo warto zwrócić uwagę szczególnie na nazwy właściwości, ich domyślne ustawienia oraz opcje konfiguracji. W przypadku **fs\_search** mówimy także o możliwości dopasowania zarówno nazw plików, jak i fragmentów treści, co zwiększa elastyczność i potencjalnie skuteczność wyszukiwania.
 
-![Schemat narzędzia fs\_search](https://cloud.overment.com/2026-01-27/ai_devs_4_fs_search-f5ebca01-4.png)
+![Schemat narzędzia fs\_search](images/ai_devs_4_fs_search-f5ebca01-4.png)
 
 Na koniec mamy jeszcze **fs\_manage**, w którego przypadku możemy nawet **usuwać pliki**. Warto się zastanowić czy w ogóle chcemy dawać agentowi taką możliwość, ale w tym przypadku i tak została ona ograniczona do pojedynczego pliku oraz wyłącznie **pustych** katalogów. W niektórych aplikacjach możemy tu jeszcze rozważyć koncepcję "kosza" bądź rodzaju archiwum, co pozwoli na łatwe przywrócenie usuniętych treści.
 
-![Schemat narzędzia fs\_manage](https://cloud.overment.com/2026-01-27/ai_devs_4_fs_manage-5a927df9-b.png)
+![Schemat narzędzia fs\_manage](images/ai_devs_4_fs_manage-5a927df9-b.png)
 
 Powyższe przykłady oddają zasady, którymi możemy kierować się przy projektowaniu narzędzi dla dowolnych integracji. Z powodzeniem można je także wykorzystać przy projektowaniu API, aby ułatwić późniejszą integrację z modelami językowymi.
 
@@ -128,13 +128,13 @@ Całość układa nam się w następujące zasady:
 - Błędnie ustalone wartości powinny sugerować dostępne opcje, np. "Błędny rodzaj etykiety. Dostępne etykiety to: 'X, Y, Z'".
 - Informacje o korektach wprowadzonych przez narzędzia, np. "Żądano wczytania zakresu linii 48–70, ale dokument ma tylko 59 linii. Wczytano dostępny zakres 48–59."
 
-![Wskazówki dla LLM w odpowiedziach narzędzi](https://cloud.overment.com/2026-01-27/ai_devs_4_hints_llm-16782f1c-6.png)
+![Wskazówki dla LLM w odpowiedziach narzędzi](images/ai_devs_4_hints_llm-16782f1c-6.png)
 
 Powyższe dynamiczne komunikaty generowane z pomocą kodu zawsze będą oznaczały jego znacznie większą złożoność. W końcu generyczne komunikaty błędów API nie wynikają z intencji programistów, lecz tego, że wymagają napisania wysokiej jakości kodu, co zwykle zajmowało mnóstwo czasu.
 
 Chociażby rozszerzenie logiki skanowania katalogów o pełne raportowanie nie tylko rezultatów ale też statusów dla poszczególnych rezultatów, zwiększa złożoność aplikacji oraz wymagane zaangażowanie na etapie jej planowania.
 
-![](https://cloud.overment.com/2026-01-27/ai_devs_4_hint_complexity-4767c8b8-b.png)
+![](images/ai_devs_4_hint_complexity-4767c8b8-b.png)
 
 Obecnie jednak **nie należy z tego rezygnować** bo zarówno etap planowania jak i implementacji może być znacznie ułatwiony przez współpracę z AI. Generowanie przypadków użycia, testów oraz samego kodu, w tym także wielokrotne iterowanie leży w zasięgu nawet pojedynczych developerów i małych zespołów.
 
@@ -148,7 +148,7 @@ Choć Function Calling jest dostępny u każdego providera, tak formaty API ró�
 
 Model Context Protocol wymaga, aby nasza aplikacja stała się **hostem** umożliwiającym tworzenie połączeń (tzw. **client**) z zewnętrznym procesem lub aplikacją określaną jako **server**. Wszystkie trzy koncepcje (host/client/server) stanowią fundament protokołu.
 
-![](https://cloud.overment.com/2026-01-28/ai_devs_4_mcp_concepts-2bc4062d-d.png)
+![](images/ai_devs_4_mcp_concepts-2bc4062d-d.png)
 
 Aby to lepiej zrozumieć, spójrzmy na przykład [01\_03\_mcp\_native](https://github.com/i-am-alice/4th-devs/tree/main/01_03_mcp_native). Jest to prosta aplikacja spełniająca definicję **hosta**, ponieważ pozwala na tworzenie połączeń za które odpowiada **client**. Jedynie fizycznie **server** znajduje się w tym samym katalogu, natomiast równie dobrze może być przeniesiony w inne miejsce.
 
@@ -163,11 +163,11 @@ Tymczasem nasz **host** składa się z następujących elementów:
 
 Całość prezentuje się następująco:
 
-![Połączenie natywnych narzędzi z narzędziami MCP](https://cloud.overment.com/2026-01-28/ai_devs_4_mcp_tools-890847b5-8.png)
+![Połączenie natywnych narzędzi z narzędziami MCP](images/ai_devs_4_mcp_tools-890847b5-8.png)
 
 Przekładając to na interakcję widzimy, że z perspektywy agenta **źródło pochodzenia narzędzi nie ma znaczenia**. Czyli z tej perspektywy Model Context Protocol dotyczy **sposobu przechowywania i dostarczania narzędzi* w spójnej formie*\*, dzięki czemu możemy łatwo podłączać serwery MCP do różnych Hostów, np. Claude Code, Cursor czy ChatGPT.
 
-![Przykład interakcji z agentem wyposażonym w narzędzia natywne oraz MCP](https://cloud.overment.com/2026-01-28/ai_devs_4_mcp_interaction-7f4d92bc-0.png)
+![Przykład interakcji z agentem wyposażonym w narzędzia natywne oraz MCP](images/ai_devs_4_mcp_interaction-7f4d92bc-0.png)
 
 Nim przejdziemy dalej, dodam tylko, że **narzędzia nie są jedynym elementem serwerów MCP**. Resztą zajmiemy się niebawem.
 
@@ -177,23 +177,23 @@ Model Context Protocol to nie tylko narzędzia dla agentów, ale także:
 
 1. **Apps:** czyli interaktywne interfejsy zwracane w odpowiedzi agenta, obejmujące nie tylko wyświetlanie danych, ale także możliwość wykonywania akcji bez opuszczania aplikacji klienta.
 
-![MCP Apps](https://cloud.overment.com/2026-01-29/ai_devs_4_mcp_apps-fb210306-c.png)
+![MCP Apps](images/ai_devs_4_mcp_apps-fb210306-c.png)
 
 2. **Resources:** Statyczne bądź dynamiczne dane do odczytu, np. pliki tekstowe, obrazy czy listy zasobów (np. /users). Ich sposób aktywacji podczas interakcji nie jest zdefiniowany i może być uzależniony zarówno od interfejsu użytkownika, jak i od decyzji agenta.
 
-![MCP Resources](https://cloud.overment.com/2026-01-29/ai_devs_4_mcp_resources-e3c48eb8-a.png)
+![MCP Resources](images/ai_devs_4_mcp_resources-e3c48eb8-a.png)
 
 3. **Prompts:** to predefiniowane instrukcje, mogące zawierać dynamiczne elementy. Ich aktywacja jest uzależniona od użytkownika, który może wybrać je np. z listy dostępnych komend.
 
-![MCP Prompts](https://cloud.overment.com/2026-01-29/ai_devs_4_mcp_prompts-dd7e84ce-0.png)
+![MCP Prompts](images/ai_devs_4_mcp_prompts-dd7e84ce-0.png)
 
 4. **Sampling:** to możliwość odwróconej interakcji w której to Serwer MCP przesyła żądanie, które ma zostać przesłane do modelu. Interakcja ta wymaga bezwzględnej akceptacji ze strony użytkownika.
 
-![](https://cloud.overment.com/2026-01-29/ai_devs_4_mcp_sampling-cb5c8953-8.png)
+![](images/ai_devs_4_mcp_sampling-cb5c8953-8.png)
 
 5. **Elicitation:** podobnie jak sampling, to możliwość odwróconej komunikacji, ale w tym przypadku kierowanej do użytkownika, np. uzupełnienie formularza bądź wykonania zewnętrznej akcji w przeglądarce.
 
-![](https://cloud.overment.com/2026-01-29/ai_devs_4_elicitation-305381f2-4.png)
+![](images/ai_devs_4_elicitation-305381f2-4.png)
 
 Obecnie większość serwerów MCP w ogóle nie wykorzystuje powyższych możliwości. Wsparcie po stronie klientów również bywa zazwyczaj ograniczone, lecz ostatnio pojawia się coraz więcej aplikacji oferujących pełną obsługę całego protokołu. Zauważalne są także przykłady serwerów MCP, które wykraczają poza udostępnianie wyłącznie narzędzi.
 
@@ -222,7 +222,7 @@ Takie podejście **może** się sprawdzić, ale jego ograniczeniem jest brak mo�
 
 Poniższa wizualizacja przedstawia różnicę między dwoma podejściami, która jasno sugeruje, że w pierwszym przypadku **mamy dużą kontrolę, ale niską elastyczność**, a w drugim sytuacja jest odwrotna: zyskujemy wysoką dynamikę, lecz pojawia się zarówno ryzyko błędu, jak i szansa na znacznie lepsze rezultaty.
 
-![Porównanie workflow z agentem w kontekście tłumaczeń](https://cloud.overment.com/2026-01-29/ai_devs_4_workflow_vs_agent-de39b393-d.png)
+![Porównanie workflow z agentem w kontekście tłumaczeń](images/ai_devs_4_workflow_vs_agent-de39b393-d.png)
 
 Nasz agent będzie składał się z trzech głównych elementów:
 
@@ -232,7 +232,7 @@ Nasz agent będzie składał się z trzech głównych elementów:
 
 Także system plików oraz proces serwera MCP udostępniającego narzędzia technicznie znajdują się "poza aplikacją", ale są z nią połączone. Widzimy także, że **MCP Client** stanowi część naszej aplikacji, a to oznacza, że spełnia ona definicję **MCP Host**, pomimo tego, że nie posiada graficznego interfejsu.
 
-![Architektura agenta do tłumaczeń](https://cloud.overment.com/2026-01-29/ai_devs_4_translation_agent-301a7de1-2.png)
+![Architektura agenta do tłumaczeń](images/ai_devs_4_translation_agent-301a7de1-2.png)
 
 Połączenie MCP **Client - Server** jest dla nas nowym elementem, więc przyjrzyjmy się mu bliżej. Mowa konkretnie o pliku [client.js](https://github.com/i-am-alice/4th-devs/blob/main/01_03_mcp_translator/src/mcp/client.js) w którym:
 
@@ -240,7 +240,7 @@ Połączenie MCP **Client - Server** jest dla nas nowym elementem, więc przyjrz
 - **Połączenie:** tworzymy połączenie, którym zarządza klient. Przekazujemy tu argumenty, zmienne środowiskowe, a w zamian otrzymujemy połączenie z serwerem MCP.
 - **Komunikacja:** klient w każdej chwili może poprosić serwer o zwrócenie listy dostępnych narzędzi, być poinformowany o zmianach oraz wykonywać wskazane przez agenta funkcje.
 
-![Połączenie MCP](https://cloud.overment.com/2026-01-29/ai_devs_4_mcp_connection-7a4e6f4d-0.png)
+![Połączenie MCP](images/ai_devs_4_mcp_connection-7a4e6f4d-0.png)
 
 Całość znajduje się w przykładzie [01\_03\_mcp\_translator](https://github.com/i-am-alice/4th-devs/tree/main/01_03_mcp_translator), który po uruchomieniu **przetłumaczy** przykładowy dokument, który zostanie zapisany w katalogu **workspace/translated**. Podobnie też jeśli dodamy nowy plik tekstowy do katalogu **workspace/translate**, agent na niego zareaguje i rozpocznie przetwarzanie.
 
@@ -305,11 +305,11 @@ Sytuacja komplikuje się, gdy do gry wchodzi OAuth, ponieważ znacznie zwiększa
 
 Wszystkie etapy są także widoczne na poniższych wizualizacjach. Choć nie będziemy wchodzić w detale poszczególnych procesów, tak istotne jest tylko zapamiętanie, że muszą być one obecne przy projektowaniu serwerów MCP wykorzystujących OAuth. Kod źródłowy prezentujący implementację OAuth dla serwera MCP znajduje się także w repozytorium z szablonem.
 
-![OAuth w serwerach MCP](https://cloud.overment.com/2026-01-30/ai_devs_4_mcp_security-2da663fe-5.png)
+![OAuth w serwerach MCP](images/ai_devs_4_mcp_security-2da663fe-5.png)
 
 OAuth po stronie hosta / klienta porusza się po tych niemal tych samych etapach, ale bliżej strony użytkownika. Jego zadaniem jest poprowadzenie go przez cały proces oraz poprawna obsługa wymagań ze strony serwera.
 
-![OAuth w dla MCP Host/Client](https://cloud.overment.com/2026-01-30/ai_devs_4_mcp_host_security-b5d29927-d.png)
+![OAuth w dla MCP Host/Client](images/ai_devs_4_mcp_host_security-b5d29927-d.png)
 
 W tej chwili nie będziemy zajmować się budowaniem hostów MCP wykorzystujących OAuth, ale wrócimy do tego w dalszych lekcjach. Tymczasem, posiadając tokeny dostępu bądź klucze API przechodzimy w obszar zarządzania uprawnieniami do zasobów i akcji, który wygląda dokładnie tak, jak w przypadku aplikacji, które tworzymy na co dzień.
 
@@ -363,11 +363,11 @@ Udostępnienie serwera stworzonego na podstawie naszego szablonu obejmuje:
 
 Ponownie też w obsłudze Cloudflare oraz **wrangler** bardzo pomocne jest AI.
 
-![Konfiguracja Cloudflare Workers dla MCP](https://cloud.overment.com/2026-01-30/ai_devs_4_cloudflare-51ea7f86-1.png)
+![Konfiguracja Cloudflare Workers dla MCP](images/ai_devs_4_cloudflare-51ea7f86-1.png)
 
 Proces publikacji wygląda podobnie dla własnego VPS i nginx, natomiast tutaj konfiguracja wymaga samodzielnego ustawienia serwera oraz aplikacji.
 
-![Podstawowa konfiguracja NGINX dla Remote MCP](https://cloud.overment.com/2026-01-30/ai_devs_4_nginx-959684a3-6.png)
+![Podstawowa konfiguracja NGINX dla Remote MCP](images/ai_devs_4_nginx-959684a3-6.png)
 
 Jeśli chodzi o serwery STDIO, to jak wspomniałem, powinniśmy wykorzystywać je wyłącznie z myślą o procesach lokalnych, na przykład w połączeniu z aplikacjami desktopowymi (np. Claude) bądź narzędziami CLI (np. Claude Code). W ich przypadku proces instalacji serwera MCP może być utrudniony szczególnie dla nietechnicznych użytkowników.
 

@@ -3,28 +3,53 @@ import { nativeTools, isNativeTool, executeNativeTool } from './tools.js'
 
 const MAX_STEPS = 30
 
+const DIVIDER = '─'.repeat(70)
+
 // ─── OpenAI Responses API call ────────────────────────────────────────────────
 
 const chat = async (messages) => {
+  const payload = {
+    model: agentConfig.model,
+    instructions: agentConfig.instructions,
+    input: messages,
+    tools: nativeTools,
+  }
+
+  console.log(`\n${DIVIDER}`)
+  console.log(`🧠 [LLM →] Sending to OpenAI (model: ${agentConfig.model})`)
+  console.log(`   instructions: ${agentConfig.instructions.substring(0, 120)}...`)
+  console.log(`   input has ${messages.length} item(s):`)
+  for (const [i, m] of messages.entries()) {
+    const preview = JSON.stringify(m).substring(0, 200)
+    console.log(`     [${i}] ${preview}${JSON.stringify(m).length > 200 ? '...' : ''}`)
+  }
+  console.log(`   tools: [${nativeTools.map(t => t.name).join(', ')}]`)
+
   const response = await fetch('https://api.openai.com/v1/responses', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${OPENAI_API_KEY}`,
     },
-    body: JSON.stringify({
-      model: agentConfig.model,
-      instructions: agentConfig.instructions,
-      input: messages,
-      tools: nativeTools,
-    }),
+    body: JSON.stringify(payload),
   })
 
   const data = await response.json()
 
+  console.log(`\n🧠 [LLM ←] Response from OpenAI (status: ${response.status})`)
+
   if (!response.ok) {
+    console.log(`   ERROR: ${JSON.stringify(data.error)}`)
     throw new Error(data.error?.message ?? `OpenAI API error ${response.status}`)
   }
+
+  console.log(`   usage: input_tokens=${data.usage?.input_tokens}, output_tokens=${data.usage?.output_tokens}`)
+  console.log(`   output (${(data.output ?? []).length} item(s)):`)
+  for (const item of data.output ?? []) {
+    const preview = JSON.stringify(item).substring(0, 300)
+    console.log(`     • ${item.type}: ${preview}${JSON.stringify(item).length > 300 ? '...' : ''}`)
+  }
+  console.log(DIVIDER)
 
   return data
 }
@@ -71,11 +96,13 @@ export const run = async (task) => {
     // Execute each tool call and append results
     for (const tc of toolCalls) {
       const args = JSON.parse(tc.arguments)
-      console.log(`\n⚡ ${tc.name}(${JSON.stringify(args.answer)})`)
+      console.log(`\n⚡ [TOOL CALL] ${tc.name}`)
+      console.log(`   call_id: ${tc.call_id}`)
+      console.log(`   args:    ${JSON.stringify(args, null, 2).split('\n').join('\n   ')}`)
 
       const result = await executeNativeTool(tc.name, args)
-      const preview = JSON.stringify(result).substring(0, 300)
-      console.log(`   → ${preview}${preview.length === 300 ? '...' : ''}`)
+
+      console.log(`\n   [TOOL RESULT] → ${JSON.stringify(result)}`)
 
       messages.push({
         type: 'function_call_output',

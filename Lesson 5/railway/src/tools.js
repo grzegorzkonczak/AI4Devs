@@ -35,26 +35,44 @@ Always start with action "help" to read the API documentation before taking any 
   }
 ]
 
+// ─── Logger ───────────────────────────────────────────────────────────────────
+
+const log = {
+  req:  (msg)       => console.log(`  📤 [HTTP →] ${msg}`),
+  res:  (msg)       => console.log(`  📥 [HTTP ←] ${msg}`),
+  wait: (msg)       => console.log(`  ⏳ [WAIT]   ${msg}`),
+  retry:(msg)       => console.log(`  🔁 [RETRY]  ${msg}`),
+  rl:   (msg)       => console.log(`  🚦 [RATELIM] ${msg}`),
+}
+
 // ─── Tool handler (what actually runs) ───────────────────────────────────────
 
 const handlers = {
   async call_railway_api({ answer }) {
-    const body = JSON.stringify({
-      apikey: RAILWAY_API_KEY,
-      task: RAILWAY_TASK,
-      answer,
-    })
+    const payload = { apikey: RAILWAY_API_KEY, task: RAILWAY_TASK, answer }
+    const body = JSON.stringify(payload)
 
+    let attempt = 0
     while (true) {
+      attempt++
+      log.req(`POST ${RAILWAY_API_URL}  (attempt #${attempt})`)
+      log.req(`Body: ${JSON.stringify(answer)}`)
+
       const res = await fetch(RAILWAY_API_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
       })
 
+      log.res(`Status: ${res.status}`)
+
+      // Print ALL response headers so nothing is missed
+      const headers = Object.fromEntries(res.headers)
+      log.res(`Headers: ${JSON.stringify(headers)}`)
+
       // 503 — simulated overload, retry after short delay
       if (res.status === 503) {
-        console.log('    [tool] 503 — retrying in 2s...')
+        log.retry(`503 server overload — waiting 2s before retry...`)
         await sleep(2000)
         continue
       }
@@ -63,22 +81,29 @@ const handlers = {
       if (res.status === 429) {
         const retryAfter = res.headers.get('Retry-After') ?? res.headers.get('X-RateLimit-Reset') ?? '10'
         const waitSec = parseInt(retryAfter)
-        console.log(`    [tool] 429 — rate limited, waiting ${waitSec}s...`)
+        log.rl(`429 rate limit hit — must wait ${waitSec}s for reset`)
+        log.wait(`Sleeping ${waitSec}s...`)
         await sleep(waitSec * 1000)
+        log.wait(`Done sleeping, retrying now`)
         continue
       }
 
-      const data = await res.json()
+      const text = await res.text()
+      log.res(`Raw body: ${text}`)
 
-      // Log remaining rate limit quota after every successful call
+      // Log remaining rate limit quota if present
       const remaining = res.headers.get('X-RateLimit-Remaining')
       const reset = res.headers.get('X-RateLimit-Reset') ?? res.headers.get('Retry-After')
       if (remaining !== null) {
-        console.log(`    [tool] rate limit: ${remaining} remaining, resets in ${reset}s`)
+        log.rl(`${remaining} calls remaining, resets in ${reset}s`)
       }
 
-      // Return the parsed JSON to the LLM — whether success or API-level error
-      return data
+      // Parse JSON — return to LLM whether success or API-level error
+      try {
+        return JSON.parse(text)
+      } catch {
+        return { raw: text }
+      }
     }
   }
 }

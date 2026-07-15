@@ -32,21 +32,36 @@ const logLlmReceive = (response) => {
 const chat = async (messages) => {
   logLlmSend(messages)
 
-  const res = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: agentConfig.model,
-      instructions: agentConfig.instructions,
-      input: messages,
-      tools: nativeTools,
-    }),
-  })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error?.message ?? `OpenAI error ${res.status}`)
+  while (true) {
+    const res = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
+      body: JSON.stringify({
+        model: agentConfig.model,
+        instructions: agentConfig.instructions,
+        input: messages,
+        tools: nativeTools,
+      }),
+    })
+    const data = await res.json()
 
-  logLlmReceive(data)
-  return data
+    // OpenAI TPM / RPM rate limit — parse wait time from error message and retry
+    if (res.status === 429) {
+      const msg = data.error?.message ?? ''
+      const match = msg.match(/try again in ([\d.]+)s/i)
+      const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 15
+      console.log(`\n⏳ [OpenAI 429] Rate limit hit — waiting ${waitSec}s before retry...`)
+      console.log(`   Reason: ${msg}`)
+      await new Promise(r => setTimeout(r, waitSec * 1000))
+      console.log(`   Retrying now...`)
+      continue
+    }
+
+    if (!res.ok) throw new Error(data.error?.message ?? `OpenAI error ${res.status}`)
+
+    logLlmReceive(data)
+    return data
+  }
 }
 
 const extractToolCalls = r => (r.output ?? []).filter(i => i.type === 'function_call')

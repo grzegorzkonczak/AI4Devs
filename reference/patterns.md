@@ -940,35 +940,7 @@ const items = await runtime.repositories.items.listByAgent(agent.id)
 
 ---
 
-## 28. Persistent Conversation History (Multi-turn REPL)
-
-**What it solves:** Follow-up questions in a REPL session lose context if each `run()` call starts fresh. Carrying the full message history between calls makes the agent remember everything said in the session.
-
-**Structure:**
-```js
-// agent.js - run() takes history in and returns updated history out
-export const run = async (query, { mcpClient, mcpTools, conversationHistory = [] }) => {
-  const messages = [...conversationHistory, { role: "user", content: query }]
-  // ...agent loop appends LLM output + tool results to messages...
-  return { response: text, conversationHistory: messages }  // caller gets updated history
-}
-
-// repl.js - caller owns the history, passes it back each turn
-let conversation = { history: [] }
-const result = await run(input, { ..., conversationHistory: conversation.history })
-conversation.history = result.conversationHistory   // save for next question
-
-// 'clear' command resets without restarting:
-conversation = { history: [] }
-```
-
-**Key design:** `run()` does not mutate the input — it creates a new array with `[...conversationHistory, newMsg]`. The caller gets the updated history as a return value and decides when to reset it.
-
-**Seen in:** `agent.js` + `repl.js` in `02_01_agentic_rag`
-
----
-
-## 29. System Prompt as Search Algorithm (Agentic RAG)
+## 28. System Prompt as Search Algorithm (Agentic RAG)
 
 **What it solves:** An agent searching documents needs a strategy for *how* to search — not just permission to call search tools. Without a strategy, the agent searches once with the literal query and gives up if it finds nothing. With a strategy, it adapts, deepens, and verifies coverage.
 

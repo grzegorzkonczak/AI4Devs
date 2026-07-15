@@ -149,27 +149,16 @@ Each reasoning item may have multiple summary entries → `flatMap` collapses th
 
 ## src/agent.js — Agent loop with conversation history
 
-### New: `conversationHistory` parameter
-```js
-export const run = async (query, { mcpClient, mcpTools, conversationHistory = [] }) => {
-  const messages = [...conversationHistory, { role: "user", content: query }]
-  // ...agent loop...
-  return { response: text, conversationHistory: messages }
-}
-```
+**Same pattern as `01_04_image_editing`** — first introduced there. `run()` takes `conversationHistory` in, returns updated history out, REPL stores it between questions. No new concepts here — same mechanism applied to document search instead of image editing.
 
-**`conversationHistory = []`** — default parameter: if not passed, starts as empty array.
-
-**`[...conversationHistory, { role: "user", content: query }]`** — spread creates a NEW array (doesn't mutate the original) with all prior history plus the new user message.
-
-**Critical difference from previous examples**: every prior `run()` started fresh. Here the caller passes in the full prior history, and `run()` returns the updated history. The REPL stores it and passes it back next question. Follow-up questions work naturally without re-explaining context.
+The only minor variation: `createConversation()` is a tiny factory (`() => ({ history: [] })`) extracted into `agent.js`. In `image_editing` the REPL used `let history = []` directly. Same idea, slightly more structured.
 
 ### Parallel tool execution (familiar from Lesson 4)
 ```js
 const runTools = (mcpClient, toolCalls) =>
   Promise.all(toolCalls.map(tc => runTool(mcpClient, tc)))
 ```
-All tool calls fire in parallel — useful when the LLM fires multiple searches at once.
+All tool calls fire in parallel — useful when the LLM fires multiple file searches at once.
 
 ### Error resilience in `runTool`
 ```js
@@ -210,10 +199,10 @@ resetStats()
 | `extractReasoning()` | `api.js` | Extracts `"reasoning"` output items from response |
 | `flatMap()` | `api.js` | map + flat in one; new Array method |
 | `...spread` in object literal | `api.js` | Merges object entries: `{ ...obj }` |
-| `conversationHistory` parameter | `agent.js` | Persistent multi-turn conversation across REPL questions |
-| Default parameter `= []` | `agent.js` | If arg missing, use default value |
 | `resolveModelForProvider()` | `config.js` | OpenAI/OpenRouter transparent model name resolution |
 | Search strategy as system prompt | `config.js` | Generic algorithm, not subject-specific instructions |
+
+**Not new (already covered in `01_04_image_editing`):** `conversationHistory` pattern — `run()` takes history in, returns updated history out, REPL stores it.
 
 ---
 

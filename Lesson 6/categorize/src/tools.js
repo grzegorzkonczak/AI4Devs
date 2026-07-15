@@ -1,0 +1,160 @@
+import { API_KEY, HUB_URL, CSV_URL, TASK } from './config.js'
+
+const sleep = ms => new Promise(r => setTimeout(r, ms))
+
+// ─── CSV parser ───────────────────────────────────────────────────────────────
+// Handles simple CSV — splits on newlines, then on first comma only
+// so descriptions containing commas stay intact.
+const parseCsv = (text) => {
+  const lines = text.trim().split('\n').filter(Boolean)
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+  return lines.slice(1).map(line => {
+    const firstComma = line.indexOf(',')
+    const values = firstComma === -1
+      ? [line.trim()]
+      : [line.slice(0, firstComma).trim(), line.slice(firstComma + 1).trim()]
+    return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']))
+  })
+}
+
+// ─── Hub API client with retry ────────────────────────────────────────────────
+const callHub = async (payload, label) => {
+  let attempt = 0
+  while (true) {
+    attempt++
+    console.log(`  [hub] ${label} (attempt ${attempt})`)
+
+    const res = await fetch(HUB_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apikey: API_KEY, task: TASK, ...payload }),
+    })
+
+    if (res.status === 503) {
+      console.log('  [hub] 503 — retrying in 2s...')
+      await sleep(2000)
+      continue
+    }
+    if (res.status === 429) {
+      const wait = parseInt(res.headers.get('Retry-After') ?? '10')
+      console.log(`  [hub] 429 — waiting ${wait}s...`)
+      await sleep(wait * 1000)
+      continue
+    }
+
+    const data = await res.json()
+    console.log(`  [hub] ← ${JSON.stringify(data)}`)
+    return data
+  }
+}
+
+// ─── Tool definitions (what the LLM sees) ────────────────────────────────────
+export const nativeTools = [
+  {
+    type: 'function',
+    name: 'fetch_items',
+    description: 'Download the current list of 10 cargo items to classify. Returns an array of { id, description } objects. Call this first to understand what needs classifying.',
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+  },
+  {
+    type: 'function',
+    name: 'test_prompt',
+    description: `Test a classification prompt template against all 10 items.
+Steps performed automatically: reset budget → fetch fresh items → send 10 requests.
+Use {id} and {description} as placeholders — they will be replaced with real values.
+Put static instructions FIRST, {id} and {description} LAST for best caching.
+Returns per-item results and the flag if all 10 were correct.
+Send prompt_template "reset" to just reset the budget counter without testing.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        prompt_template: {
+          type: 'string',
+          description: 'The prompt template to test. Use {id} and {description} as placeholders for item data at the end.',
+        },
+      },
+      required: ['prompt_template'],
+      additionalProperties: false,
+    },
+  },
+]
+
+// ─── Tool handlers (what actually runs) ──────────────────────────────────────
+const handlers = {
+  async fetch_items() {
+    console.log(`\n[fetch_items] Downloading CSV from ${CSV_URL}`)
+    const res = await fetch(CSV_URL)
+    if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`)
+    const text = await res.text()
+    console.log(`[fetch_items] Raw CSV:\n${text}`)
+    const items = parseCsv(text)
+    console.log(`[fetch_items] Parsed ${items.length} items`)
+    return items
+  },
+
+  async test_prompt({ prompt_template }) {
+    // Special case: just reset
+    if (prompt_template.trim().toLowerCase() === 'reset') {
+      const result = await callHub({ answer: { prompt: 'reset' } }, 'RESET')
+      return { reset: true, response: result }
+    }
+
+    // Step 1: reset budget
+    console.log('\n[test_prompt] Step 1: Resetting budget...')
+    await callHub({ answer: { prompt: 'reset' } }, 'RESET')
+
+    // Step 2: fetch fresh items
+    console.log('[test_prompt] Step 2: Fetching fresh items...')
+    const res = await fetch(CSV_URL)
+    if (!res.ok) throw new Error(`CSV fetch failed: ${res.status}`)
+    const items = parseCsv(await res.text())
+    console.log(`[test_prompt] Got ${items.length} items`)
+
+    // Step 3: test each item
+    console.log('[test_prompt] Step 3: Testing all items...')
+    const results = []
+    let flag = null
+
+    for (const item of items) {
+      const prompt = prompt_template
+        .replace('{id}', item.id ?? item['id'] ?? '')
+        .replace('{description}', item.description ?? item['description'] ?? item['name'] ?? '')
+
+      console.log(`\n  [item ${item.id}] prompt: "${prompt}"`)
+      const response = await callHub({ answer: { prompt } }, `item ${item.id}`)
+
+      // Extract flag if present
+      if (response.message && response.message.includes('{FLG:')) {
+        flag = response.message
+      }
+
+      results.push({
+        id: item.id,
+        description: item.description ?? item['name'],
+        prompt_sent: prompt,
+        response,
+        ok: response.ok === true || response.code === 0,
+      })
+    }
+
+    const allCorrect = results.every(r => r.ok)
+    return {
+      allCorrect,
+      flag,
+      results: results.map(r => ({
+        id: r.id,
+        description: r.description,
+        ok: r.ok,
+        response: r.response,
+      })),
+    }
+  },
+}
+
+// ─── Registry ─────────────────────────────────────────────────────────────────
+export const isNativeTool = name => name in handlers
+export const executeNativeTool = async (name, args) => {
+  const handler = handlers[name]
+  if (!handler) throw new Error(`Unknown tool: ${name}`)
+  return handler(args)
+}

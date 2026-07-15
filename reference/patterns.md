@@ -937,3 +937,71 @@ const items = await runtime.repositories.items.listByAgent(agent.id)
 ```
 
 **Seen in:** `repositories/` in `01_05_agent`
+
+---
+
+## 28. Persistent Conversation History (Multi-turn REPL)
+
+**What it solves:** Follow-up questions in a REPL session lose context if each `run()` call starts fresh. Carrying the full message history between calls makes the agent remember everything said in the session.
+
+**Structure:**
+```js
+// agent.js - run() takes history in and returns updated history out
+export const run = async (query, { mcpClient, mcpTools, conversationHistory = [] }) => {
+  const messages = [...conversationHistory, { role: "user", content: query }]
+  // ...agent loop appends LLM output + tool results to messages...
+  return { response: text, conversationHistory: messages }  // caller gets updated history
+}
+
+// repl.js - caller owns the history, passes it back each turn
+let conversation = { history: [] }
+const result = await run(input, { ..., conversationHistory: conversation.history })
+conversation.history = result.conversationHistory   // save for next question
+
+// 'clear' command resets without restarting:
+conversation = { history: [] }
+```
+
+**Key design:** `run()` does not mutate the input — it creates a new array with `[...conversationHistory, newMsg]`. The caller gets the updated history as a return value and decides when to reset it.
+
+**Seen in:** `agent.js` + `repl.js` in `02_01_agentic_rag`
+
+---
+
+## 29. System Prompt as Search Algorithm (Agentic RAG)
+
+**What it solves:** An agent searching documents needs a strategy for *how* to search — not just permission to call search tools. Without a strategy, the agent searches once with the literal query and gives up if it finds nothing. With a strategy, it adapts, deepens, and verifies coverage.
+
+**Structure:**
+```
+System prompt encodes the algorithm, not the subject matter:
+
+SCAN:   explore structure first — folder hierarchy, file names, headings
+DEEPEN (iterative):
+  1. Search with initial keywords + synonyms (3-5 angles minimum)
+  2. Read most promising fragments from results
+  3. Collect NEW terms discovered while reading (new terminology, section names, etc.)
+  4. Search again with those newly discovered terms
+  5. Repeat until no significant new terms emerge
+EXPLORE: for each topic, investigate related angles (cause/effect, part/whole,
+          problem/solution, limitations/workarounds, requirements/config)
+VERIFY:  before answering, check coverage: definitions, numbers, edge cases, steps, exceptions
+         — if gaps remain, go back to DEEPEN
+```
+
+**Critical design choice — generic instructions + minimal specific context:**
+```
+// Generic (stays forever):
+"Scan folder hierarchies, search with synonyms, iteratively discover new terms..."
+
+// Minimal specific (just what the agent MUST know upfront):
+"Your knowledge base consists of AI_devs course materials stored as S01*.md files.
+ The content is written in Polish — use Polish keywords when searching."
+```
+
+The lesson compares this to designing generic software components: flexible enough for any subject domain, not so abstract it becomes useless.
+
+**Why reasoning helps here:** Agentic search requires planning (what to search next?) and meta-cognition (have I found enough?). Enabling `reasoning: { effort: "medium" }` lets the model think before acting — especially valuable for the VERIFY phase.
+
+**Seen in:** `src/config.js` instructions in `02_01_agentic_rag`
+

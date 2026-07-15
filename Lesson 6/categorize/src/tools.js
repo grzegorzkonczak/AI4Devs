@@ -3,8 +3,10 @@ import { API_KEY, HUB_URL, CSV_URL, TASK } from './config.js'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
-// Handles simple CSV — splits on newlines, then on first comma only
-// so descriptions containing commas stay intact.
+// Splits on first comma only so descriptions containing commas stay intact.
+// Strips surrounding quotes from values (CSV standard quoting).
+const stripQuotes = s => s?.replace(/^["']|["']$/g, '').trim() ?? ''
+
 const parseCsv = (text) => {
   const lines = text.trim().split('\n').filter(Boolean)
   const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
@@ -13,7 +15,10 @@ const parseCsv = (text) => {
     const values = firstComma === -1
       ? [line.trim()]
       : [line.slice(0, firstComma).trim(), line.slice(firstComma + 1).trim()]
-    return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']))
+    const obj = Object.fromEntries(headers.map((h, i) => [h, stripQuotes(values[i] ?? '')]))
+    // Normalise: if CSV uses 'code' as the identifier column, alias it as 'id' too
+    if (obj.code && !obj.id) obj.id = obj.code
+    return obj
   })
 }
 
@@ -120,9 +125,12 @@ const handlers = {
     let flag = null
 
     for (const [idx, item] of items.entries()) {
-      const id = item.id ?? ''
+      const id = item.id ?? item.code ?? ''
       const description = item.description ?? item.name ?? ''
-      const prompt = prompt_template.replace('{id}', id).replace('{description}', description)
+      const prompt = prompt_template
+        .replace(/{id}/g, id)
+        .replace(/{code}/g, id)           // agent may use {code} — both work
+        .replace(/{description}/g, description)
 
       console.log(`\n  [${idx + 1}/10] Item: ${id} — "${description}"`)
       console.log(`  [${idx + 1}/10] Prompt sent: "${prompt}"`)

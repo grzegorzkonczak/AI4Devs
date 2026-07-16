@@ -1,0 +1,78 @@
+{
+  "1x1": {
+    "edges": [
+      "top",
+      "right"
+    ],
+    "shape": "elbow",
+    "description": "An elbow-shaped cable exiting the top and right edges."
+  },
+  "1x2": {
+    "edges": [
+      "left",
+      "right",
+      "bottom"
+    ],
+    "shape": "tee",
+    "description": "A tee-shaped cable reaching left, right, and bottom edges."
+  },
+  "1x3": {
+    "edges": [
+      "left",
+      "right"
+    ],
+    "shape": "straight",
+    "description": "A straight horizontal cable connects the left and right edges."
+  },
+  "2x1": {
+    "edges": [
+      "top",
+      "bottom"
+    ],
+    "shape": "straight",
+    "description": "A vertical straight cable connects the top and bottom edges."
+  },
+  "2x2": {
+    "edges": [
+      "top",
+      "right",
+      "bottom"
+    ],
+    "shape": "tee",
+    "description": "A tee-shaped cable connects top, bottom, and right edges."
+  },
+  "2x3": {
+    "edges": [
+      "left",
+      "right",
+      "bottom"
+    ],
+    "shape": "tee",
+    "description": "A T-shaped cable with exits to the left, right, and bottom edges."
+  },
+  "3x1": {
+    "edges": [
+      "top",
+      "left",
+      "right"
+    ],
+    "shape": "tee",
+    "description": "A T-shaped cable exits left, right, and top edges."
+  },
+  "3x2": {
+    "edges": [
+      "top",
+      "left"
+    ],
+    "shape": "elbow",
+    "description": "An elbow-shaped cable exits through the left and top edges."
+  },
+  "3x3": {
+    "edges": [
+      "top",
+      "right"
+    ],
+    "shape": "elbow",
+    "description": "An elbow-shaped cable connecting the top and right edges."
+  }
+}

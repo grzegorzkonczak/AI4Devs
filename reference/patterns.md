@@ -1022,3 +1022,34 @@ return { content: chunk.content, metadata: { ...chunk.metadata, context } }
 Two variants: (a) **context** = enrich existing separator chunks with an LLM prefix; (b) **topics** = one LLM call splits the whole doc into `{topic, content}` chunks by meaning. Parse defensively (strip ``` fences and retry). Content is never rewritten — the LLM only adds metadata / chooses boundaries.
 
 **Seen in:** `src/strategies/context.js` and `src/strategies/topics.js` in `02_02_chunking`
+
+
+---
+
+## 31. Semantic Similarity (Embeddings + Cosine)
+
+**What it solves:** Measuring *meaning-based* closeness between texts (not keyword overlap), the semantic half of hybrid RAG. Text is encoded to a fixed-length vector, then two vectors are compared by the cosine of the angle between them.
+
+**Structure:**
+```js
+// 1. Embed via the Embeddings API (NOT the Responses API)
+const embed = async (text) => {
+  const res = await fetch(EMBEDDINGS_API_ENDPOINT, {          // /v1/embeddings
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${AI_API_KEY}`, ...EXTRA_API_HEADERS },
+    body: JSON.stringify({ model: "text-embedding-3-small", input: text }),  // fields: model + input
+  })
+  const data = await res.json()
+  return data.data[0].embedding                                // array of 1536 floats
+}
+
+// 2. Compare with cosine similarity = (a·b) / (|a|·|b|)  ->  ~1 same meaning, ~0 unrelated
+const cosineSimilarity = (a, b) => {
+  let dot = 0, normA = 0, normB = 0
+  for (let i = 0; i < a.length; i++) { dot += a[i]*b[i]; normA += a[i]*a[i]; normB += b[i]*b[i] }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB))
+}
+```
+Same input -> identical vector (stable meaning). Embeddings API differs from Responses API: request `{model, input}`, response `data.data[0].embedding`. `data.data` is an array so one endpoint can embed many inputs at once.
+
+**Seen in:** `app.js` in `02_02_embedding`

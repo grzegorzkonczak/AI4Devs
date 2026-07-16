@@ -129,9 +129,11 @@ const handlers = {
 
       const msg = String(response.message ?? "")
 
-      // Insufficient funds mid-test: abort remaining items (no point calling hub further)
+      // If budget is exhausted, stop making further hub calls (they will all fail the same way).
+      // Return outOfBudget: true so the LLM can decide what to do next.
       if (msg.toLowerCase().includes("insufficient")) {
-        console.log(`           [${String(idx + 1).padStart(2)}/10] STOP  ${String(id).padEnd(8)} out of budget - aborting`)
+        console.log(`           [${String(idx + 1).padStart(2)}/10] STOP  ${String(id).padEnd(8)} budget exhausted`)
+        results.push({ id, description, ok: false, response })
         break
       }
 
@@ -144,12 +146,18 @@ const handlers = {
 
     const passed = results.filter(r => r.ok).length
     const failedIds = results.filter(r => !r.ok).map(r => r.id).join(', ')
+    const outOfBudget = results.some(r => String(r.response?.message ?? '').toLowerCase().includes('insufficient'))
 
-    console.log(`\n     Result: ${passed}/10 correct${passed < 10 ? `  (failed: ${failedIds})` : ''}`)
+    if (outOfBudget) {
+      console.log(`\n     Budget exhausted after ${results.length} item(s) — prompt likely caused expensive non-cached response`)
+    } else {
+      console.log(`\n     Result: ${passed}/10 correct${passed < 10 ? `  (failed: ${failedIds})` : ''}`)
+    }
     if (flag) console.log(`     *** FLAG: ${flag} ***`)
 
     return {
       allCorrect: passed === 10,
+      outOfBudget,
       flag,
       passed,
       total: items.length,

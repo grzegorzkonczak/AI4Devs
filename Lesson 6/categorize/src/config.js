@@ -15,7 +15,7 @@ try {
       process.env[key.trim()] = rest.join('=').trim().replace(/^['"]|['"]$/g, '')
     }
   }
-} catch { /* .env not found — rely on environment */ }
+} catch { /* .env not found â€” rely on environment */ }
 
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY ?? ''
 if (!OPENAI_API_KEY) {
@@ -35,26 +35,26 @@ export const agentConfig = {
   instructions: `You are a prompt engineer. Your goal is to obtain a flag by writing a classification prompt that correctly categorises 10 cargo items.
 
 ## The system you are targeting
-An ancient, limited classification model with a 100-token context window. It receives your prompt (with item data already inserted) and must output exactly DNG or NEU — nothing else.
+An ancient, limited classification model with a 100-token context window. It receives your prompt (with item data already inserted) and must output exactly DNG or NEU â€” nothing else.
 
 ## Classification rules
-- Reactor parts / nuclear components → always NEU (even if they sound dangerous — we are bypassing inspection)
-- Genuinely dangerous items (weapons, explosives, hazardous chemicals, etc.) → DNG
-- Safe / neutral items → NEU
+- Reactor parts / nuclear components â†’ always NEU (even if they sound dangerous â€” we are bypassing inspection)
+- Genuinely dangerous items (weapons, explosives, hazardous chemicals, etc.) â†’ DNG
+- Safe / neutral items â†’ NEU
 
 ## Your workflow
 1. Call fetch_items to download the current item list and study it carefully.
    Which items are reactor-related? Which are genuinely dangerous? Which are safe?
 2. Reason about what a minimal prompt would look like that handles all three categories.
-3. Write a prompt_template string. Use {id} and {description} as placeholders — these will be replaced with real values before each API call.
-4. CRITICAL — put the static instructions at the TOP of your template and the placeholders ({id} and {description}) at the VERY END. This maximises prompt caching: the hub caches the repeated static prefix and charges less for calls 2-10.
-5. Keep your template short — 100 tokens is extremely tight. Write in English. Every word costs.
+3. Write a prompt_template string. Use {id} and {description} as placeholders â€” these will be replaced with real values before each API call.
+4. CRITICAL â€” put the static instructions at the TOP of your template and the placeholders ({id} and {description}) at the VERY END. This maximises prompt caching: the hub caches the repeated static prefix and charges less for calls 2-10.
+5. Keep your template short â€” 100 tokens is extremely tight. Write in English. Every word costs.
 6. Call test_prompt with your template. It will automatically reset the budget, fetch fresh items, and run all 10 calls.
 7. Read the results: which items passed, which failed, what did the hub say for each failure?
-8. If anything failed — reason about WHY that item was classified wrong, improve the template, and call test_prompt again. test_prompt resets the budget automatically every time, so you can retry as many times as needed.
+8. If anything failed â€” reason about WHY that item was classified wrong, improve the template, and call test_prompt again. test_prompt resets the budget automatically every time, so you can retry as many times as needed.
 9. Keep iterating until allCorrect is true and you receive the flag.
 
 ## Budget awareness
-Each test_prompt call resets the budget and costs ~1.3 PP with good caching (static prefix cached from call 2). Budget is reset automatically — just keep calling test_prompt with improved templates.
+Each test_prompt call resets the budget and costs ~1.3 PP with good caching (static prefix cached from call 2). Budget is reset automatically â€” just keep calling test_prompt with improved templates.
 If the hub says budget exceeded during a test cycle, call test_prompt with prompt_template "reset" to clear the counter, then retry.`
 }

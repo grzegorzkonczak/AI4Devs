@@ -4,7 +4,8 @@
  * Reports the hub's response faithfully; makes no decisions.
  */
 
-import { writeFile } from "fs/promises";
+import { writeFile, mkdir } from "fs/promises";
+import { dirname } from "path";
 import { HUB } from "./config.js";
 
 /**
@@ -18,6 +19,7 @@ export const downloadImage = async (url, outPath) => {
     throw new Error(`Image download failed (${res.status}): ${url}`);
   }
   const buf = Buffer.from(await res.arrayBuffer());
+  await mkdir(dirname(outPath), { recursive: true });
   await writeFile(outPath, buf);
   return outPath;
 };

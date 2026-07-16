@@ -20,8 +20,9 @@ import { MODELS, PATHS } from "./config.js";
 import { getBoardImage, getTargetImage, rotate } from "./hub.js";
 import { describeBoard } from "./vision.js";
 import { rotationsToAlign } from "./geometry.js";
+import { postJson } from "./net.js";
 
-const MAX_TURNS = 40; // mechanics: hard stop so a confused model can't loop forever
+const MAX_TURNS = 60; // mechanics: hard stop so a confused model can't loop forever
 
 const SYSTEM_PROMPT = `You are solving the "electricity" puzzle. A 3x3 grid holds nine
 cable tiles. Each tile's cable exits some of its four edges: top, right, bottom, left.
@@ -40,24 +41,36 @@ CELL ADDRESSING: cells are "RxC", row x column, 1-indexed from the top-left. So 
 top-left, "1x3" top-right, "3x1" bottom-left, "3x3" bottom-right.
 
 STRATEGY:
-1. Call inspect_target_board once to learn the goal edges for every cell.
-2. Call inspect_current_board to see your board's current edges.
-3. For each cell, compare current edges to target edges. Decide how many clockwise
-   rotations are needed. You may reason it yourself; you may ALSO call rotations_to_align
-   with the two edge lists to double-check your count (it returns 0..3, or -1 if the two
-   shapes are not rotations of each other).
-4. Apply the needed rotations with the rotate tool, one call per 90-degree turn.
-5. After acting, inspect_current_board again to verify every cell now matches the target.
-   Keep going until the rotate response yields the flag.
+1. Call inspect_target_board once to learn the goal edges for every cell. Keep these
+   numbers; the target never changes.
+2. Call inspect_current_board once to see your board's current edges.
+3. Build a plan for the WHOLE board in one pass: for each of the nine cells, compare its
+   current edges to its target edges and decide how many clockwise rotations it needs. You
+   may reason it yourself; you may ALSO call rotations_to_align with the two edge lists to
+   double-check each count (it returns 0..3, or -1 if the shapes are not rotations of each
+   other). A cell that already matches needs 0 rotations — leave it alone.
+4. Execute the whole plan with the rotate tool: one call per 90-degree turn (a cell needing
+   3 turns gets three rotate calls). You do NOT need to re-inspect between individual
+   rotations — rotation is deterministic, so you already know what each turn does.
+5. Only AFTER applying the full plan, call inspect_current_board ONCE to verify every cell
+   now matches the target. If some cells are still off, plan and rotate again, then verify
+   again. Keep going until a rotate response yields the flag.
+
+IMPORTANT ON RESPONSES: every rotate call returns {"message":"Done"} while the puzzle is
+unsolved — that only confirms the move was accepted, it is NOT success. The board is solved
+only when a rotate response contains a flag (a FLG field, or text announcing the flag).
+Report that flag and stop.
 
 EDGE-CASE KNOWLEDGE:
-- The current and target versions of a cell always have the SAME number of edges (only
-  rotation differs). If rotations_to_align returns -1, or the edge counts differ, then the
-  vision read is probably wrong for that tile — re-inspect the board and re-evaluate rather
-  than trusting the bad read.
-- Tiles that are fully symmetric under rotation (a straight piece read identically, a cross)
-  may already match with 0 rotations; don't rotate a cell that already equals its target.
-- Prefer to verify with a fresh inspect_current_board before concluding you are done.`;
+- The current and target versions of a cell ALWAYS have the same number of edges (only
+  rotation differs). The vision reader occasionally misses the short third leg of a tee and
+  reports it as a two-edge straight. So if a cell's current edge-count differs from its
+  target edge-count (or rotations_to_align returns -1), trust the TARGET's edge-count and
+  treat the current read as noise: re-inspect that board once and re-plan. Do not endlessly
+  re-inspect after every rotation — that wastes calls and can hit rate limits.
+- A straight piece looks identical after a 180-degree turn and a cross after any turn; such
+  cells may already match with 0 rotations. Never rotate a cell that already equals target.
+- Verify with a single fresh inspect_current_board before concluding you are done.`;
 
 // ── Tool definitions (what the model sees) ─────────────────────
 
@@ -149,17 +162,11 @@ const callModel = async (input) => {
     reasoning: { effort: "medium" },
   };
 
-  const res = await fetch(RESPONSES_API_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${AI_API_KEY}`,
-      ...EXTRA_API_HEADERS,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await res.json();
+  const data = await postJson(
+    RESPONSES_API_ENDPOINT,
+    { Authorization: `Bearer ${AI_API_KEY}`, ...EXTRA_API_HEADERS },
+    body
+  );
   if (data.error) throw new Error(`Orchestrator error: ${data.error.message}`);
   return data;
 };

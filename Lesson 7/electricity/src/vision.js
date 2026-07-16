@@ -11,8 +11,11 @@
 
 import { readFile } from "fs/promises";
 import { AI_API_KEY, RESPONSES_API_ENDPOINT, EXTRA_API_HEADERS } from "../../config.js";
-import { MODELS, PATHS } from "./config.js";
+import { MODELS, PATHS, EDGES } from "./config.js";
 import { cropTiles } from "./image.js";
+import { postJson } from "./net.js";
+
+const SAMPLES = 3; // read each tile a few times and take the majority (vision reliability)
 
 const INSTRUCTIONS = `You are a vision analyst for a 3x3 electrical wiring puzzle.
 You are shown ONE tile, cropped and cleaned to black shapes on a white background.
@@ -57,11 +60,9 @@ const toDataUrl = async (path) => {
 };
 
 /**
- * Classifies a single tile image via the vision model. Returns { cell, edges, shape, description }.
+ * Reads a single tile ONCE via the vision model. Returns { edges, shape, description }.
  */
-const classifyTile = async (cell, path) => {
-  const dataUrl = await toDataUrl(path);
-
+const readTileOnce = async (cell, dataUrl) => {
   const body = {
     model: MODELS.vision,
     instructions: INSTRUCTIONS,
@@ -79,17 +80,11 @@ const classifyTile = async (cell, path) => {
     },
   };
 
-  const res = await fetch(RESPONSES_API_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${AI_API_KEY}`,
-      ...EXTRA_API_HEADERS,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await res.json();
+  const data = await postJson(
+    RESPONSES_API_ENDPOINT,
+    { Authorization: `Bearer ${AI_API_KEY}`, ...EXTRA_API_HEADERS },
+    body
+  );
   if (data.error) throw new Error(`Vision error (${cell}): ${data.error.message}`);
 
   const message = data.output.find((item) => item.type === "message");
@@ -97,7 +92,40 @@ const classifyTile = async (cell, path) => {
   if (!text) throw new Error(`Vision returned no content for ${cell}`);
 
   const parsed = JSON.parse(text);
-  return { cell, edges: parsed.edges, shape: parsed.shape, description: parsed.description };
+  return { edges: parsed.edges, shape: parsed.shape, description: parsed.description };
+};
+
+/** Canonical key for an edge-set, order-independent, in clockwise order. */
+const edgeKey = (edges) => EDGES.filter((e) => edges.includes(e)).join(",");
+
+/**
+ * Classifies a tile by reading it SAMPLES times and taking the majority
+ * edge-set. This is reliability mechanics: the model occasionally drops a
+ * short third leg (a tee read as a straight), and voting cancels that noise.
+ * Returns { cell, edges, shape, description }.
+ */
+const classifyTile = async (cell, path) => {
+  const dataUrl = await toDataUrl(path);
+
+  const reads = await Promise.all(
+    Array.from({ length: SAMPLES }, () => readTileOnce(cell, dataUrl))
+  );
+
+  const tally = new Map();
+  for (const r of reads) {
+    const key = edgeKey(r.edges);
+    const entry = tally.get(key) ?? { count: 0, read: r };
+    entry.count += 1;
+    tally.set(key, entry);
+  }
+
+  let winner = null;
+  for (const entry of tally.values()) {
+    if (!winner || entry.count > winner.count) winner = entry;
+  }
+
+  const { edges, shape, description } = winner.read;
+  return { cell, edges, shape, description };
 };
 
 /**

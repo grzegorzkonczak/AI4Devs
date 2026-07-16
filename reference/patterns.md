@@ -977,3 +977,48 @@ The lesson compares this to designing generic software components: flexible enou
 
 **Seen in:** `src/config.js` instructions in `02_01_agentic_rag`
 
+
+
+---
+
+## 29. Recursive Separator Chunking
+
+**What it solves:** Splitting a document into similarly-sized chunks that respect its structure, so retrieval returns coherent passages instead of arbitrary character windows.
+
+**Structure:**
+```js
+const SEPARATORS = ["\n## ", "\n### ", "\n\n", "\n", ". ", " "]
+
+const split = (text, size, overlap, separators, stats) => {
+  if (text.length <= size) return [text]                 // base case
+  const sep = separators.find(s => text.includes(s))     // coarsest available
+  if (!sep) return [text]
+  // greedily re-glue parts up to `size`, carry a clean-boundary overlap tail
+  const remaining = separators.slice(separators.indexOf(sep) + 1)
+  return chunks.flatMap(c =>
+    c.length > size && remaining.length ? split(c, size, overlap, remaining, stats) : [c]
+  )                                                        // recurse with finer separators
+}
+```
+Drill headers -> paragraphs -> sentences -> words until every chunk fits. `stats` only reports dropped/trimmed overlaps (facts, no decisions). Attach a `section` via a heading index + mid-chunk sample lookup (`findSection`).
+
+**Seen in:** `src/strategies/separators.js` + `src/utils.js` in `02_02_chunking`
+
+---
+
+## 30. LLM Metadata Enrichment (Contextual Retrieval)
+
+**What it solves:** A chunk read in isolation is often ambiguous ("I showed you this using..."). Anthropic's contextual retrieval fixes this by generating a short context/topic that situates the chunk, improving both lexical and semantic search hit rates.
+
+**Structure:**
+```js
+// content stays verbatim; only metadata grows
+const context = await chat(
+  `<chunk>${chunk.content}</chunk>`,
+  "Generate a very short (1-2 sentence) context situating this chunk in the document. Return ONLY the context."
+)
+return { content: chunk.content, metadata: { ...chunk.metadata, context } }
+```
+Two variants: (a) **context** = enrich existing separator chunks with an LLM prefix; (b) **topics** = one LLM call splits the whole doc into `{topic, content}` chunks by meaning. Parse defensively (strip ``` fences and retry). Content is never rewritten — the LLM only adds metadata / chooses boundaries.
+
+**Seen in:** `src/strategies/context.js` and `src/strategies/topics.js` in `02_02_chunking`

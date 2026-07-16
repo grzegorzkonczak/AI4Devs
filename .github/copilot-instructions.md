@@ -1,5 +1,41 @@
 # Copilot Instructions
 
+---
+
+## 🧠 CORE PRINCIPLE — Read this before every exercise
+
+This is a course about **building agentic AI applications**. Every exercise solution must demonstrate the LLM making decisions — not your code making decisions on its behalf.
+
+### The fundamental boundary
+
+| Belongs in **code** (mechanics) | Belongs in **LLM** (reasoning) |
+|---|---|
+| Retry loops on 429/503 | What to try next after a failure |
+| Stop making calls you know will fail | Whether to change strategy |
+| Parse and return API responses faithfully | Interpret what a response means |
+| Expose capabilities as tools | Decide which tool to call and when |
+| Short-circuit to avoid wasted calls | Decide what constitutes success |
+
+**If you find yourself writing an `if/else` that decides what the agent does next — stop. That decision belongs in the LLM's instructions.**
+
+### The tool contract
+A tool has exactly two responsibilities:
+1. **Report facts** — return what happened faithfully (errors, hints, status codes, flags)
+2. **Handle pure mechanics** — retries, deduplication, avoiding provably-pointless calls
+
+A tool must NOT: interpret results, choose a next action, or stop the agent loop based on its own judgment.
+
+### Where reasoning goes
+Agent reasoning lives in the **system prompt** (`instructions` / `agentConfig`). When you discover a new edge case (e.g. budget exhaustion means "your prompt was ambiguous"), encode that knowledge in the system prompt so the LLM can reason about it — not as a hard `if` branch in a tool handler.
+
+### Canonical examples
+- ✅ **Railway (Lesson 5)**: LLM reads `help` docs, deduces the correct call sequence, executes it. No hardcoded steps.
+- ✅ **Categorize (Lesson 6)**: Tool returns `outOfBudget: true`. System prompt explains what it means. LLM decides whether to rethink the prompt or reset. Tool doesn't decide for it.
+- ❌ Bad: tool detects "insufficient funds" and picks a recovery strategy itself
+- ❌ Bad: hardcoded `if result.failed → retry with different params` in the agent loop
+
+---
+
 ## Project overview
 
 This is the **AI_devs 4: Builders** course workspace — a Node.js project for building hands-on exercises that integrate LLM APIs (OpenAI, Anthropic, Gemini) into application logic. Each lesson lives in its own `Lesson N/` directory containing a Markdown lesson file and exercise data files.
@@ -81,22 +117,13 @@ Tool definitions require precise `name`, `description`, and `parameters` schema 
 - Course API key: `4abb691a-12aa-4546-82c5-1b6ba1c19f60` (safe to use in course exercises)
 - Hub endpoint: `https://hub.ag3nts.org/verify`
 
-## Exercise coding style (IMPORTANT)
+## Exercise coding style
 
-### ⚠️ Course philosophy — ALWAYS apply this
+### ⚠️ Course philosophy — see top of this file for the full principle
 
-This is a course about **using AI and building agentic applications**. Every exercise solution MUST be built with an LLM/agentic approach from the start. **Never reach for deterministic/hardcoded logic when the point of the exercise is to practice AI utilisation.**
+Short version: **LLMs decide, code handles mechanics.** Always agentic from the start.
 
 Ask yourself before writing any code: *"Is an LLM making decisions here, or am I just scripting?"*
-
-- ✅ LLM reads API docs from `help` response and decides what to call → agentic
-- ✅ LLM classifies, routes, evaluates, plans → agentic  
-- ❌ Hardcoded sequence of API calls → deterministic, defeats the purpose
-- ❌ `if/else` chains deciding what to do next → deterministic, defeats the purpose
-
-Deterministic code is fine for **mechanics** (retrying 503s, sleeping on rate limits, parsing JSON) — things that don't require reasoning. But the **decisions** must go through the LLM.
-
-The Lesson 5 railway exercise is the canonical example: the agent read `help`, deduced the 3-step sequence, and executed it — all from a single goal-oriented prompt. No hardcoded steps.
 
 ### Tool pattern
 

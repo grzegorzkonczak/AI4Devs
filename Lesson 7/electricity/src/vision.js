@@ -18,18 +18,23 @@ import { postJson } from "./net.js";
 const SAMPLES = 1; // clean inset crops read deterministically; one sample suffices
 
 const INSTRUCTIONS = `You are a vision analyst for a 3x3 electrical wiring puzzle.
-You are shown ONE tile: a solid black cable shape on a white background. The tile is
-cleanly cropped — there is NO grid frame, only the cable itself.
+You are shown ONE tile: a solid black cable shape on a white background, cleanly
+cropped (no grid frame). Just outside the four sides are small GRAY reference
+letters — T (top), B (bottom), L (left), R (right). These letters are NOT part of
+the cable; use them only to name the sides correctly and avoid orientation mistakes.
 
-The cable exits through some of the four edges: top, right, bottom, left. Report every edge
-the black shape actually reaches. Look carefully: a "tee" has a SHORT third stub in addition
-to its main bar — do not overlook it and mislabel a tee as a straight.
+The cable exits through some of the four sides. Trace each straight arm of the black
+shape from the center outward and see which labeled side it reaches. Report exactly
+those sides. Look carefully: a "tee" has a SHORT third stub in addition to its main
+bar — do not overlook it. Do not confuse a side with its opposite (T vs B, L vs R) —
+the gray letters are there precisely to prevent that.
 
 Report:
-- description: one short sentence about the cable shape and where it exits.
-- edges: the list of edges the cable reaches (subset of top/right/bottom/left).
-- shape: straight (2 opposite edges), elbow (2 adjacent edges), tee (3 edges),
-  cross (4 edges), end (1 edge), or empty (no cable).
+- description: one short sentence naming which labeled sides the cable reaches.
+- edges: the list of sides the cable reaches, as full words (subset of
+  top/right/bottom/left, matching the T/R/B/L labels).
+- shape: straight (2 opposite sides), elbow (2 adjacent sides), tee (3 sides),
+  cross (4 sides), end (1 side), or empty (no cable).
 
 Be precise: the number of edges must match the shape (straight/elbow=2, tee=3,
 cross=4, end=1, empty=0).`;

@@ -52,28 +52,31 @@ const main = async () => {
     console.log("board-final.json missing — run did not capture a final board.");
   }
 
-  // 1) DECISIVE TEST: vision's target read vs the true target (the solved board).
+  // 1) CONSISTENCY TEST: vision's target read vs its read of the solved board.
+  //    Both are the SAME solved orientation, so the reads SHOULD match. If they
+  //    disagree, vision misread at least one of them — the tile PNGs are the only
+  //    true ground truth (do not trust either vision read to grade the other).
   if (final) {
-    console.log("=== TARGET READ vs TRUE TARGET (solved board) ===");
-    console.log("A mismatch means vision MISREAD the target for that cell.\n");
-    let misreads = 0;
+    console.log("=== TARGET READ vs FINAL READ (same solved tile, read twice) ===");
+    console.log("A mismatch means vision was INCONSISTENT — check the tile PNGs (ground truth).\n");
+    let disagreements = 0;
     for (const cell of CELLS) {
       const t = edges(target, cell);
       const f = edges(final, cell);
       const off = t && f ? rotationsToAlign(t, f) : null;
       const match = t && f && off === 0;
-      if (!match) misreads++;
+      if (!match) disagreements++;
       const note =
         off === null ? "?" :
-        off === 0 ? "ok" :
-        off === -1 ? "DIFFERENT SHAPE (gross misread)" :
-        `MISREAD by ${off} CW rotation(s)`;
-      console.log(`  ${cell}: target-read ${fmt(t).padEnd(26)} true ${fmt(f).padEnd(26)} ${note}`);
+        off === 0 ? "consistent" :
+        off === -1 ? "DIFFERENT SHAPE (gross misread — inspect PNG)" :
+        `INCONSISTENT by ${off} CW rotation(s) — inspect tiles-target vs tiles-final PNG`;
+      console.log(`  ${cell}: target-read ${fmt(t).padEnd(26)} final-read ${fmt(f).padEnd(26)} ${note}`);
     }
     console.log(
-      misreads
-        ? `\n=> ${misreads} target cell(s) were misread. The solve depended on the hub (ground truth), not on vision being right — NOT a coincidence.`
-        : "\n=> Vision's target read matched the true target exactly. The solve was straightforwardly correct."
+      disagreements
+        ? `\n=> ${disagreements} cell(s) read inconsistently (almost always elbows). The solve still succeeded because the HUB is ground truth and the stop-condition lives in the LLM — NOT a coincidence. Open the named PNGs to see the true orientation.`
+        : "\n=> Vision read every cell consistently between target and final. Clean solve."
     );
   }
 

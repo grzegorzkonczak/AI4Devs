@@ -70,6 +70,24 @@ const detectGridBbox = (data, w, h) => {
 export const cropTiles = async (pngPath, outDir) => {
   await mkdir(outDir, { recursive: true });
 
+  const CONTENT = 200; // binarized cable rendered at this size
+  const MARGIN = 34; // white margin around it, holds the edge labels
+  const CANVAS = CONTENT + 2 * MARGIN;
+
+  /**
+   * SVG overlay that writes T/B/L/R just outside each edge of the cable content.
+   * The letters are gray (not black) and sit in the margin, never touching the
+   * cable — they give the vision model an absolute orientation reference so it
+   * can't confuse an elbow with its rotation (the one shape it misread).
+   */
+  const LABELS_SVG = Buffer.from(`<svg width="${CANVAS}" height="${CANVAS}" xmlns="http://www.w3.org/2000/svg">
+    <style>text{font-family:sans-serif;font-weight:bold;fill:#8a8a8a}</style>
+    <text x="${CANVAS / 2}" y="26" font-size="26" text-anchor="middle">T</text>
+    <text x="${CANVAS / 2}" y="${CANVAS - 10}" font-size="26" text-anchor="middle">B</text>
+    <text x="16" y="${CANVAS / 2 + 9}" font-size="26" text-anchor="middle">L</text>
+    <text x="${CANVAS - 16}" y="${CANVAS / 2 + 9}" font-size="26" text-anchor="middle">R</text>
+  </svg>`);
+
   const { data, info } = await sharp(pngPath)
     .grayscale()
     .raw()
@@ -97,11 +115,20 @@ export const cropTiles = async (pngPath, outDir) => {
       const cell = `${r + 1}x${c + 1}`;
       const path = `${outDir}/tile_${cell}.png`;
 
-      await sharp(pngPath)
+      // 1) Binarize the cable to CONTENT x CONTENT (pure black on white).
+      const content = await sharp(pngPath)
         .extract({ left, top, width, height })
         .grayscale()
-        .threshold(DARK) // pure black cable on white — drops beige texture
-        .resize(200, 200, { kernel: "nearest" })
+        .threshold(DARK) // drops beige texture
+        .resize(CONTENT, CONTENT, { kernel: "nearest" })
+        .toBuffer();
+
+      // 2) Add a white margin and stamp T/B/L/R just outside each edge, so the
+      //    vision model has an absolute orientation reference (fixes elbows).
+      await sharp(content)
+        .extend({ top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN, background: "#ffffff" })
+        .composite([{ input: LABELS_SVG, top: 0, left: 0 }])
+        .png()
         .toFile(path);
 
       tiles.push({ cell, path });

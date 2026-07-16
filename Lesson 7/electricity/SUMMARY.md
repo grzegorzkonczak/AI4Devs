@@ -142,6 +142,50 @@ failed twice before the real bug surfaced.
 
 ---
 
+## 4b. Post-mortem: "was the flag a coincidence?" (No.)
+
+After the win, one thing looked odd: on the successful run the model **re-rotated
+`1x1` twice after a verify step already showed it matched the target**, and the
+flag arrived on that second extra rotation. We instrumented the app (`src/log.js`
+archives every inspection's tile PNGs + JSON to `runlog/`, `analyze.js` diffs a
+run) and did one diagnostic pass. **Then we looked at the actual tile PNGs.**
+
+**Verified finding — the pixels are the only ground truth:**
+- Vision reads **straights, tees, and crosses** reliably.
+- Vision **misreads ELBOW *orientation*** — it can report `[top,left]` for an
+  elbow whose pixels clearly exit `[bottom,right]` (a 180° flip), and the read can
+  **flip-flop between inspections**. Elbows are rotationally symmetric-looking
+  enough that gpt-4.1 loses the absolute orientation.
+- So the "extra" `1x1` rotations were the model **probing a shaky elbow**, not a
+  bug. Across the run both elbows received a **net-zero** number of rotations
+  (multiples of 4) — harmless probing.
+
+**Why the solve was still legitimate, not luck:**
+1. **Relative comparison cancels *consistent* bias.** `rotations_to_align` compares
+   the current read to the target read. If vision misreads both the same way, the
+   *difference* is still correct → 0 rotations when already aligned.
+2. **The hub is the ground-truth judge.** Only the hub decides "solved" (it returns
+   the flag). Vision never gets to be right or wrong about the final state.
+3. **The stop-condition lives in the LLM, not in code** ("keep going until the hub
+   returns the flag"). So when an elbow read looked shaky, the model kept probing
+   instead of falsely declaring victory. That's the course principle paying off:
+   the *judgment* to continue was the LLM's, the *mechanics* were the tools'.
+
+**Caveat about `analyze.js` (self-grading trap):** its consistency check compares
+vision's **target read** to vision's **read of the solved board**. Those are two
+reads of the *same* solved orientation, so they *should* match — a mismatch means
+vision was **inconsistent**, NOT that a specific one is "the truth." Do **not**
+trust either vision read to grade the other; open the archived tile PNGs. (Our
+first analysis pass fell into exactly this trap and blamed the wrong cell.)
+
+**The fix we then shipped — absolute orientation labels.** Cropped tiles now carry
+small **gray `T`/`B`/`L`/`R` letters** stamped in a white margin just outside each
+side (`src/image.js`), and the vision prompt tells the model these letters mark the
+edges and are not cable (`src/vision.js`). This gives the model an absolute frame
+of reference so it can no longer confuse an elbow with its rotation.
+
+---
+
 ## 5. How to run
 
 ```bash

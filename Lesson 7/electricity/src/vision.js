@@ -15,19 +15,19 @@ import { MODELS, PATHS, EDGES } from "./config.js";
 import { cropTiles } from "./image.js";
 import { postJson } from "./net.js";
 
-const SAMPLES = 3; // read each tile a few times and take the majority (vision reliability)
+const SAMPLES = 1; // clean inset crops read deterministically; one sample suffices
 
 const INSTRUCTIONS = `You are a vision analyst for a 3x3 electrical wiring puzzle.
-You are shown ONE tile, cropped and cleaned to black shapes on a white background.
+You are shown ONE tile: a solid black cable shape on a white background. The tile is
+cleanly cropped — there is NO grid frame, only the cable itself.
 
-A THICK black cable runs through the tile and exits through some of the four edges:
-top, right, bottom, left. The thin lines exactly along the border are the grid
-frame — IGNORE them. Only report an edge if the THICK cable actually reaches and
-crosses that edge.
+The cable exits through some of the four edges: top, right, bottom, left. Report every edge
+the black shape actually reaches. Look carefully: a "tee" has a SHORT third stub in addition
+to its main bar — do not overlook it and mislabel a tee as a straight.
 
 Report:
 - description: one short sentence about the cable shape and where it exits.
-- edges: the list of edges the thick cable connects to (subset of top/right/bottom/left).
+- edges: the list of edges the cable reaches (subset of top/right/bottom/left).
 - shape: straight (2 opposite edges), elbow (2 adjacent edges), tee (3 edges),
   cross (4 edges), end (1 edge), or empty (no cable).
 

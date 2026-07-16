@@ -78,15 +78,21 @@ export const cropTiles = async (pngPath, outDir) => {
   const bbox = detectGridBbox(data, info.width, info.height);
   const cw = (bbox.x1 - bbox.x0) / GRID;
   const ch = (bbox.y1 - bbox.y0) / GRID;
+  // Inset each cell to drop the thin grid frame lines that sit on the cell
+  // boundaries. The thick cable still reaches the inset edge, so edge-contact is
+  // preserved, but the frame no longer pollutes the tile (it was causing the
+  // vision model to miss stubs / hallucinate edges).
+  const insetX = cw * 0.12;
+  const insetY = ch * 0.12;
 
   const tiles = [];
 
   for (let r = 0; r < GRID; r++) {
     for (let c = 0; c < GRID; c++) {
-      const left = Math.round(bbox.x0 + c * cw);
-      const top = Math.round(bbox.y0 + r * ch);
-      const width = Math.round(bbox.x0 + (c + 1) * cw) - left;
-      const height = Math.round(bbox.y0 + (r + 1) * ch) - top;
+      const left = Math.round(bbox.x0 + c * cw + insetX);
+      const top = Math.round(bbox.y0 + r * ch + insetY);
+      const width = Math.round(bbox.x0 + (c + 1) * cw - insetX) - left;
+      const height = Math.round(bbox.y0 + (r + 1) * ch - insetY) - top;
 
       const cell = `${r + 1}x${c + 1}`;
       const path = `${outDir}/tile_${cell}.png`;

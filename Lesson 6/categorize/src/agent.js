@@ -90,7 +90,7 @@ export const run = async (task) => {
 
       // If the tool returned a flag, we're done - no need for another LLM round-trip
       if (result?.flag) {
-        console.log(\n=== FLAG OBTAINED:  ===)
+        console.log(`\n=== FLAG OBTAINED: ${result.flag} ===`)
         return result.flag
       }
     }

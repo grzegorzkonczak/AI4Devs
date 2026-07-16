@@ -128,6 +128,13 @@ const handlers = {
       }
 
       const msg = String(response.message ?? "")
+
+      // Insufficient funds mid-test: abort remaining items (no point calling hub further)
+      if (msg.toLowerCase().includes("insufficient")) {
+        console.log(`           [${String(idx + 1).padStart(2)}/10] STOP  ${String(id).padEnd(8)} out of budget - aborting`)
+        break
+      }
+
       const ok = response.ok === true || response.code === 0 || msg.toLowerCase().includes("accepted")
       const hint = ok ? 'pass' : (response.hint ?? response.message ?? 'fail')
       console.log(`           [${String(idx + 1).padStart(2)}/10] ${ok ? 'PASS' : 'FAIL'}  ${String(id).padEnd(8)} ${hint}`)

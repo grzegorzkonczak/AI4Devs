@@ -2,35 +2,10 @@ import { OPENAI_API_KEY, agentConfig } from './config.js'
 import { nativeTools, executeNativeTool } from './tools.js'
 
 const MAX_STEPS = 40
-const DIVIDER = '─'.repeat(72)
 
-// ─── Logging helpers ──────────────────────────────────────────────────────────
-const logLlmSend = (messages) => {
-  console.log(`\n${DIVIDER}`)
-  console.log(`🧠 [LLM →] Sending ${messages.length} message(s) to OpenAI`)
-  for (const [i, m] of messages.entries()) {
-    const preview = JSON.stringify(m)
-    console.log(`   [${i}] ${preview.length > 200 ? preview.substring(0, 200) + '…' : preview}`)
-  }
-}
-
-const logLlmReceive = (response) => {
-  console.log(`🧠 [LLM ←] Response (status 200)`)
-  console.log(`   tokens: ${response.usage?.input_tokens} in / ${response.usage?.output_tokens} out`)
-  for (const item of response.output ?? []) {
-    if (item.type === 'function_call') {
-      console.log(`   🔧 tool_call: ${item.name}(${item.arguments})`)
-    } else if (item.type === 'message') {
-      const text = (item.content ?? []).filter(p => p.type === 'output_text').map(p => p.text).join('')
-      console.log(`   💬 message: ${text.substring(0, 300)}${text.length > 300 ? '…' : ''}`)
-    }
-  }
-  console.log(DIVIDER)
-}
-
-// ─── OpenAI Responses API ─────────────────────────────────────────────────────
+// --- OpenAI Responses API ---
 const chat = async (messages) => {
-  logLlmSend(messages)
+  console.log(`\n Thinking... (${messages.length} messages in context)`)
 
   while (true) {
     const res = await fetch('https://api.openai.com/v1/responses', {
@@ -45,21 +20,26 @@ const chat = async (messages) => {
     })
     const data = await res.json()
 
-    // OpenAI TPM / RPM rate limit — parse wait time from error message and retry
+    // OpenAI TPM / RPM rate limit - parse wait time from error message and retry
     if (res.status === 429) {
       const msg = data.error?.message ?? ''
       const match = msg.match(/try again in ([\d.]+)s/i)
       const waitSec = match ? Math.ceil(parseFloat(match[1])) + 1 : 15
-      console.log(`\n⏳ [OpenAI 429] Rate limit hit — waiting ${waitSec}s before retry...`)
-      console.log(`   Reason: ${msg}`)
+      console.log(`  OpenAI rate limit - waiting ${waitSec}s...`)
       await new Promise(r => setTimeout(r, waitSec * 1000))
-      console.log(`   Retrying now...`)
       continue
     }
 
     if (!res.ok) throw new Error(data.error?.message ?? `OpenAI error ${res.status}`)
 
-    logLlmReceive(data)
+    // Show what the LLM said (its reasoning or plan)
+    for (const item of data.output ?? []) {
+      if (item.type === 'message') {
+        const text = (item.content ?? []).filter(p => p.type === 'output_text').map(p => p.text).join('')
+        if (text) console.log(`  Agent: ${text.length > 300 ? text.substring(0, 300) + '...' : text}`)
+      }
+    }
+
     return data
   }
 }
@@ -74,20 +54,21 @@ const extractText = r => {
     .map(p => p.text).join('')
 }
 
-// ─── Agent loop ───────────────────────────────────────────────────────────────
+// --- Agent loop ---
 export const run = async (task) => {
-  console.log(`\n🎯 Task: ${task}\n`)
+  console.log(`\n=== STARTING CATEGORIZE AGENT ===`)
+  console.log(`Task: ${task}\n`)
   const messages = [{ role: 'user', content: task }]
 
   for (let step = 1; step <= MAX_STEPS; step++) {
-    console.log(`\n══ Step ${step} / ${MAX_STEPS} ══════════════════════════════════════════════`)
+    console.log(`\n--- Step ${step} ---`)
 
     const response = await chat(messages)
     const toolCalls = extractToolCalls(response)
 
     if (toolCalls.length === 0) {
       const text = extractText(response)
-      console.log(`\n✅ Agent finished:\n${text}`)
+      console.log(`\n=== Agent done ===\n${text}`)
       return text
     }
 
@@ -95,19 +76,19 @@ export const run = async (task) => {
 
     for (const tc of toolCalls) {
       const args = JSON.parse(tc.arguments)
-      console.log(`\n⚡ [TOOL CALL] ${tc.name}`)
-      console.log(`   call_id: ${tc.call_id}`)
-      console.log(`   args:    ${JSON.stringify(args, null, 2).split('\n').join('\n   ')}`)
+
+      // Show tool call intent - include the template for test_prompt (the key info)
+      if (tc.name === 'test_prompt') {
+        console.log(`\n  -> test_prompt`)
+        console.log(`     Template: "${args.prompt_template}"`)
+      } else {
+        console.log(`\n  -> ${tc.name}`)
+      }
 
       const result = await executeNativeTool(tc.name, args)
-
-      const resultStr = JSON.stringify(result)
-      console.log(`\n   [TOOL RESULT] ${resultStr.length > 500 ? resultStr.substring(0, 500) + '…' : resultStr}`)
-
       messages.push({ type: 'function_call_output', call_id: tc.call_id, output: JSON.stringify(result) })
     }
   }
 
   throw new Error(`Max steps (${MAX_STEPS}) reached without completing the task`)
 }
-

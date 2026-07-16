@@ -87,6 +87,12 @@ export const run = async (task) => {
 
       const result = await executeNativeTool(tc.name, args)
       messages.push({ type: 'function_call_output', call_id: tc.call_id, output: JSON.stringify(result) })
+
+      // If the tool returned a flag, we're done - no need for another LLM round-trip
+      if (result?.flag) {
+        console.log(\n=== FLAG OBTAINED:  ===)
+        return result.flag
+      }
     }
   }
 

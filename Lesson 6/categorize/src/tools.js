@@ -127,7 +127,8 @@ const handlers = {
         flag = response.message
       }
 
-      const ok = response.ok === true || response.code === 0
+      const msg = String(response.message ?? "")
+      const ok = response.ok === true || response.code === 0 || msg.toLowerCase().includes("accepted")
       const hint = ok ? 'pass' : (response.hint ?? response.message ?? 'fail')
       console.log(`           [${String(idx + 1).padStart(2)}/10] ${ok ? 'PASS' : 'FAIL'}  ${String(id).padEnd(8)} ${hint}`)
 

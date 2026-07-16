@@ -21,6 +21,7 @@ import { getBoardImage, getTargetImage, rotate } from "./hub.js";
 import { describeBoard } from "./vision.js";
 import { rotationsToAlign } from "./geometry.js";
 import { postJson } from "./net.js";
+import { initRun, getRunDir, logEvent, saveBoard, saveImage } from "./log.js";
 
 const MAX_TURNS = 60; // mechanics: hard stop so a confused model can't loop forever
 
@@ -134,21 +135,36 @@ const TOOLS = [
 
 // ── Tool handlers (what actually runs) ─────────────────────────
 
+let inspectSeq = 0;
+
+/** Downloads a board, describes it, and archives PNG + JSON for later analysis. */
+const inspectAndArchive = async (getImage, srcPath, label) => {
+  await getImage(srcPath);
+  await saveImage(label, srcPath);
+  const board = await describeBoard(srcPath, { tilesDir: `${getRunDir()}/tiles-${label}` });
+  await saveBoard(label, board);
+  return board;
+};
+
 const toolHandlers = {
-  inspect_target_board: async () => {
-    await getTargetImage(PATHS.targetPng);
-    const board = await describeBoard(PATHS.targetPng, { tilesDir: "workspace/tiles-target" });
-    return board;
-  },
-  inspect_current_board: async () => {
-    await getBoardImage(PATHS.boardPng);
-    const board = await describeBoard(PATHS.boardPng, { tilesDir: "workspace/tiles-current" });
-    return board;
-  },
+  inspect_target_board: async () => inspectAndArchive(getTargetImage, PATHS.targetPng, "target"),
+  inspect_current_board: async () =>
+    inspectAndArchive(getBoardImage, PATHS.boardPng, `current-${String(++inspectSeq).padStart(2, "0")}`),
   rotations_to_align: async ({ current, target }) => ({
     rotations: rotationsToAlign(current, target),
   }),
   rotate: async ({ cell }) => rotate(cell),
+};
+
+/**
+ * Diagnostic capture of the board AFTER the agent stops. If the puzzle was
+ * solved, this board equals the hub's TRUE target — so diffing it against the
+ * agent's original vision target read reveals any misread that the solve masked.
+ */
+export const captureFinalBoard = async () => {
+  const board = await inspectAndArchive(getBoardImage, PATHS.boardPng, "final");
+  await logEvent({ type: "final_capture", board });
+  return board;
 };
 
 // ── The Function-Calling loop (mechanics only) ─────────────────
@@ -176,6 +192,9 @@ const callModel = async (input) => {
  * Returns the model's final text.
  */
 export const runAgent = async () => {
+  const dir = await initRun();
+  console.log(`[log] artifacts -> ${dir}`);
+  await logEvent({ type: "run_start" });
   const input = [{ role: "user", content: "Solve the electricity puzzle. Begin." }];
 
   for (let turn = 0; turn < MAX_TURNS; turn++) {
@@ -190,6 +209,7 @@ export const runAgent = async () => {
       const message = data.output.find((item) => item.type === "message");
       const text = message?.content?.map((c) => c.text).join("") ?? "";
       console.log(`\n[final] ${text}`);
+      await logEvent({ type: "final_message", turn, text });
       return text;
     }
 
@@ -205,6 +225,7 @@ export const runAgent = async () => {
 
       const preview = JSON.stringify(result);
       console.log(`[tool] ${call.name}(${call.arguments || ""}) -> ${preview.slice(0, 200)}`);
+      await logEvent({ type: "tool_call", turn, name: call.name, args, result });
 
       input.push({
         type: "function_call_output",
@@ -214,5 +235,6 @@ export const runAgent = async () => {
     }
   }
 
+  await logEvent({ type: "max_turns" });
   throw new Error(`Reached MAX_TURNS (${MAX_TURNS}) without a final answer`);
 };

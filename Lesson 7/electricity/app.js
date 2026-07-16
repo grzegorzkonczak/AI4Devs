@@ -9,7 +9,7 @@
  *   node app.js --reset    # randomize the board first, then solve
  */
 
-import { runAgent } from "./src/agent.js";
+import { runAgent, captureFinalBoard } from "./src/agent.js";
 import { resetBoard } from "./src/hub.js";
 
 const main = async () => {
@@ -20,6 +20,16 @@ const main = async () => {
 
   console.log("Starting orchestrator...\n");
   const final = await runAgent();
+
+  // Diagnostic: capture the board as it stands after the agent stops. If solved,
+  // this equals the hub's TRUE target and can be diffed against the agent's
+  // original vision target read to expose any misread the solve masked.
+  console.log("\nCapturing final board state for analysis...");
+  try {
+    await captureFinalBoard();
+  } catch (e) {
+    console.error("Final capture failed:", e.message);
+  }
 
   console.log("\nDone.");
   return final;

@@ -1,0 +1,10 @@
+{
+  "name": "electricity",
+  "type": "module",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}

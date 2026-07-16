@@ -627,3 +627,42 @@ await writeFile(`workspace/example-${name}.jsonl`, toJsonl(chunks), "utf-8")
 Read back with `readFile(...).split("\n").filter(Boolean).map(JSON.parse)`.
 
 Seen in: `app.js` in `02_02_chunking`
+
+
+---
+
+## better-sqlite3 synchronous DB
+
+Local SQLite with prepared statements — no async/await (calls return instantly):
+
+```js
+import Database from "better-sqlite3"
+const db = new Database("data/app.db")
+db.pragma("journal_mode = WAL")
+db.exec(`CREATE TABLE IF NOT EXISTS docs (id INTEGER PRIMARY KEY, source TEXT UNIQUE, hash TEXT)`)
+
+const insert = db.prepare("INSERT INTO docs (source, hash) VALUES (?, ?)")
+const { lastInsertRowid } = insert.run(name, hash)
+const row = db.prepare("SELECT id, hash FROM docs WHERE source = ?").get(name)   // one row
+const all = db.prepare("SELECT * FROM docs").all()                               // all rows
+```
+
+Seen in: `src/db/index.js`, `src/db/indexer.js` in `02_02_hybrid_rag`
+
+---
+
+## sha256 incremental reindex (skip-unchanged)
+
+Hash content to avoid re-processing files that have not changed (pure mechanics, not a decision):
+
+```js
+import { createHash } from "crypto"
+const hashContent = (c) => createHash("sha256").update(c).digest("hex")
+
+const hash = hashContent(content)
+const existing = db.prepare("SELECT id, hash FROM documents WHERE source = ?").get(name)
+if (existing?.hash === hash) return                 // unchanged › skip
+if (existing) removeDocument(db, existing.id)       // changed › drop old, re-index
+```
+
+Seen in: `src/db/indexer.js` in `02_02_hybrid_rag`

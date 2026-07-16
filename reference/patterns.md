@@ -1053,3 +1053,61 @@ const cosineSimilarity = (a, b) => {
 Same input -> identical vector (stable meaning). Embeddings API differs from Responses API: request `{model, input}`, response `data.data[0].embedding`. `data.data` is an array so one endpoint can embed many inputs at once.
 
 **Seen in:** `app.js` in `02_02_embedding`
+
+
+---
+
+## 32. SQLite Hybrid Index (FTS5 + sqlite-vec)
+
+**What it solves:** Local, single-file storage supporting BOTH lexical (keyword/BM25) and semantic (vector/cosine) search without a separate search engine or vector DB. Low architecture complexity — all data in one SQLite file.
+
+**Structure:**
+```js
+import Database from "better-sqlite3"
+import * as sqliteVec from "sqlite-vec"
+const db = new Database("data/hybrid.db")   // synchronous: .prepare().run/get/all, .exec, .pragma
+sqliteVec.load(db)
+
+db.exec(`
+  CREATE TABLE chunks (id INTEGER PRIMARY KEY, content TEXT, section TEXT, ...);
+  -- FTS5 external-content index (no duplicate storage), synced via triggers
+  CREATE VIRTUAL TABLE chunks_fts USING fts5(content, content='chunks', content_rowid='id');
+  CREATE TRIGGER chunks_ai AFTER INSERT ON chunks BEGIN
+    INSERT INTO chunks_fts(rowid, content) VALUES (new.id, new.content); END;
+  -- sqlite-vec vector index; float[N] MUST match embedding dimensions
+  CREATE VIRTUAL TABLE chunks_vec USING vec0(chunk_id INTEGER PRIMARY KEY, embedding float[1536]);
+`)
+
+// store a vector as packed binary float32 (not JSON)
+const toVecBuffer = (arr) => Buffer.from(new Float32Array(arr).buffer)
+db.prepare("INSERT INTO chunks_vec (chunk_id, embedding) VALUES (?, ?)").run(id, toVecBuffer(vec))
+
+// query each side
+db.prepare("... WHERE chunks_fts MATCH ? ORDER BY rank LIMIT ?")          // BM25
+db.prepare("SELECT chunk_id, distance FROM chunks_vec WHERE embedding MATCH ? ORDER BY distance LIMIT ?") // cosine kNN
+```
+Triggers keep FTS in sync automatically on insert/delete/update. `EMBEDDING_DIM` in the vec table must equal the model's output dimensions.
+
+**Seen in:** `src/db/index.js`, `src/db/indexer.js`, `src/db/search.js` in `02_02_hybrid_rag`
+
+---
+
+## 33. Reciprocal Rank Fusion (RRF)
+
+**What it solves:** Merging two (or more) ranked result lists whose raw scores are NOT comparable (e.g. BM25 relevance vs cosine distance). RRF uses only rank *position*, so a document ranked high in either list rises in the fused result.
+
+**Structure:**
+```js
+const RRF_K = 60
+const scores = new Map()
+const add = (list) => list.forEach((r, rank) => {
+  const e = scores.get(r.id) ?? { ...r, rrf: 0 }
+  e.rrf += 1 / (RRF_K + rank + 1)     // each list a doc appears in adds a contribution
+  scores.set(r.id, e)
+})
+add(ftsResults); add(vecResults)
+const merged = [...scores.values()].sort((a, b) => b.rrf - a.rrf).slice(0, limit)
+```
+A doc high in both lists accumulates two contributions and tops the ranking; high in only one still scores, lower. `RRF_K=60` (standard) dampens the gap between top ranks. If one search fails, fall back gracefully to the other (report facts, don't pick a strategy).
+
+**Seen in:** `hybridSearch` in `src/db/search.js` in `02_02_hybrid_rag`

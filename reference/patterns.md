@@ -1111,3 +1111,36 @@ const merged = [...scores.values()].sort((a, b) => b.rrf - a.rrf).slice(0, limit
 A doc high in both lists accumulates two contributions and tops the ranking; high in only one still scores, lower. `RRF_K=60` (standard) dampens the gap between top ranks. If one search fails, fall back gracefully to the other (report facts, don't pick a strategy).
 
 **Seen in:** `hybridSearch` in `src/db/search.js` in `02_02_hybrid_rag`
+
+## 34. Orchestrator + Vision Subagent (multi-agent delegation)
+
+A reasoning orchestrator (Function-Calling loop) delegates perception to a vision subagent. The subagent reports FACTS only (per-tile edges via image input + Structured Outputs); the orchestrator owns all reasoning (which tiles differ, how many rotations, when done). Tools never decide the next move.
+
+```js
+// orchestrator tools = pure mechanics; reasoning lives in the system prompt
+const tools = [inspect_target_board, inspect_current_board, rotations_to_align, rotate]
+input.push(...data.output)                 // carry messages + reasoning + tool calls
+const calls = data.output.filter(i => i.type === "function_call")
+if (!calls.length) return finalText        // model decides it is done
+for (const c of calls) input.push({ type:"function_call_output", call_id:c.call_id, output:JSON.stringify(await handlers[c.name](JSON.parse(c.arguments))) })
+```
+
+**Seen in:** `src/agent.js` + `src/vision.js` in `Lesson 7/electricity`
+
+## 35. Render What the Model Sees (vision debugging)
+
+When a vision agent misbehaves, do not guess at the model or prompt — dump the exact pixels it receives and look. In the electricity puzzle, tiles read inconsistently because the crop included grid **frame lines**; the model could not "ignore the thin frame" as instructed. Fix was preprocessing (inset the crop 12% to drop the frame), not a better prompt or model. Corollary: majority-voting the SAME image gives correlated errors and only multiplies cost — voting fixes random noise, not systematic error.
+
+**Seen in:** troubleshooting in `Lesson 7/electricity/SUMMARY.md`; inset in `src/image.js`
+
+## 36. Rate-Limit Retry that Self-Paces (429/503 backoff)
+
+A POST helper that retries on 429/503 (and OpenAI rate-limit error payloads), honoring the "try again in Xs" hint, is pure mechanics (course-approved). As a side effect it self-throttles bursty parallel calls to the provider's per-minute limit — but it cannot rescue a design that simply issues too many calls per minute; fix the NEED to loop (reliable inputs) too.
+
+```js
+const rateLimited = res.status === 429 || res.status === 503 || /rate limit/i.test(data?.error?.message||"")
+if (!rateLimited) return data
+await sleep(Math.min((hintMs ?? baseDelay * 2**attempt) + 150, 20000))
+```
+
+**Seen in:** `src/net.js` in `Lesson 7/electricity`
